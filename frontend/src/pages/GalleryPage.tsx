@@ -229,60 +229,62 @@ const GalleryPage: React.FC = () => {
 
   return (
     <>
-      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen pt-20">
-        {/* Header with required 'title' prop */}
-        <Header title="Gallery" />
+      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl min-h-screen pt-20">
+        <div className="app-container flex flex-col items-center w-full">
+          {/* Header */}
+          <Header title="Gallery" />
 
-        {/* Smaller Title Above the Gallery */}
-        <h2 className="text-2xl font-semibold mt-6">Your Images:</h2>
+          {/* Smaller Title Above the Gallery */}
+          <h2 className="text-2xl font-semibold mt-6 text-black">Your Images:</h2>
 
-        {/* Scrollable Image Gallery */}
-        <div className="w-full mt-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {images.map((image) => (
-              <div
-                key={image._id}
-                className="relative group cursor-pointer overflow-hidden"
-                onClick={() => handleImageClick(image)}
-              >
-                <img
-                  src={image.imageUrl}
-                  alt={image.filename}
-                  loading="lazy"
-                  className="w-full h-auto rounded-lg object-cover transform transition-transform duration-200 hover:scale-105"
-                />
-                <button
-                  className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent triggering the image click
-                    handleDeleteClick(image._id);
-                  }}
-                  aria-label="Delete Image"
+          {/* Scrollable Image Gallery */}
+          <div className="w-full mt-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {images.map((image) => (
+                <div
+                  key={image._id}
+                  className="relative group cursor-pointer overflow-hidden"
+                  onClick={() => handleImageClick(image)}
                 >
-                  ✖
-                </button>
-              </div>
-            ))}
+                  <img
+                    src={image.imageUrl}
+                    alt={image.filename}
+                    loading="lazy"
+                    className="w-full h-auto rounded-lg object-cover transform transition-transform duration-200 hover:scale-105"
+                  />
+                  <button
+                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent triggering the image click
+                      handleDeleteClick(image._id);
+                    }}
+                    aria-label="Delete Image"
+                  >
+                    ✖
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Image Overlay Modal */}
-        {selectedImageDetails && (
-          <ImageModal
-            image={selectedImageDetails}
-            onClose={() => setSelectedImageDetails(null)}
-            onDownload={handleDownload}
-            onDelete={handleDeleteClick}
-            onFullView={handleFullView}
+          {/* Image Overlay Modal */}
+          {selectedImageDetails && (
+            <ImageModal
+              image={selectedImageDetails}
+              onClose={() => setSelectedImageDetails(null)}
+              onDownload={handleDownload}
+              onDelete={handleDeleteClick}
+              onFullView={handleFullView}
+            />
+          )}
+
+          {/* Delete Confirmation Dialog */}
+          <DeleteConfirmationDialog
+            isOpen={isDeleteDialogOpen}
+            onClose={() => setIsDeleteDialogOpen(false)}
+            onConfirm={BACKEND_AVAILABLE ? handleConfirmDelete : handleMockDelete}
           />
-        )}
-
-        {/* Delete Confirmation Dialog */}
-        <DeleteConfirmationDialog
-          isOpen={isDeleteDialogOpen}
-          onClose={() => setIsDeleteDialogOpen(false)}
-          onConfirm={BACKEND_AVAILABLE ? handleConfirmDelete : handleMockDelete}
-        />
+        </div>
       </main>
       <BottomNav />
     </>

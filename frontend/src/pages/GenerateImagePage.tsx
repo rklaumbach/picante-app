@@ -1,4 +1,4 @@
-// src/pages/GenerateImagePage.tsx
+// frontend/src/pages/GenerateImagePage.tsx
 
 import React, { useState } from 'react';
 import Header from '../components/Header';
@@ -57,26 +57,35 @@ const GenerateImagePage: React.FC = () => {
 
   return (
     <>
-      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen pt-20">
-        <Header title="Generate Image" />
-        <div className="w-full mt-6">
-          <PromptInput
-            label="Body Prompt"
-            value={bodyPrompt}
-            onChange={setBodyPrompt}
+      <main className="flex flex-col items-center px-4 pb-16 mx-auto w-full max-w-7xl min-h-screen pt-20">
+        <div className="app-container flex flex-col items-center w-full">
+          {/* Header */}
+          <Header title="Generate Image" />
+
+          {/* Prompt Inputs */}
+          <div className="w-full mt-6">
+            <PromptInput
+              label="Body Prompt"
+              value={bodyPrompt}
+              onChange={setBodyPrompt}
+            />
+            <PromptInput
+              label="Face Prompt"
+              value={facePrompt}
+              onChange={setFacePrompt}
+            />
+          </div>
+
+          {/* Generate Button */}
+          <Button
+            text="Generate"
+            className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-200"
+            onClick={handleGenerateImage}
           />
-          <PromptInput
-            label="Face Prompt"
-            value={facePrompt}
-            onChange={setFacePrompt}
-          />
+
+          {/* Display Generated Image */}
+          {generatedImage && <ImageDisplay imageUrl={generatedImage} />}
         </div>
-        <Button
-          text="Generate"
-          className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-200"
-          onClick={handleGenerateImage}
-        />
-        {generatedImage && <ImageDisplay imageUrl={generatedImage} />}
       </main>
       <OutOfCreditsDialog
         isOpen={isOutOfCreditsDialogOpen}
