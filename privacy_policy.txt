@@ -1,0 +1,137 @@
+Picante Privacy Policy
+Effective Date: [Insert Date]
+
+Parties:
+
+Data Controller: Niyout, Inc., a Delaware corporation ("Niyout," "we," "us," or "our")
+Data Subject: [Insert Licensee's Name] ("you" or "your")
+1. Introduction
+Niyout, Inc. ("Niyout," "we," "us," or "our") is committed to protecting your privacy and ensuring the security of your personal data. This Privacy Policy outlines how we collect, use, disclose, and safeguard your information when you access and use the Picante App ("App"). By using the App, you consent to the practices described in this policy.
+
+2. Definitions
+"Personal Data" refers to any information relating to an identified or identifiable natural person.
+"Processing" means any operation or set of operations performed on Personal Data, whether or not by automated means.
+"Data Controller" refers to Niyout, Inc., responsible for determining the purposes and means of Processing your Personal Data.
+"Data Processor" refers to any third party processing Personal Data on behalf of Niyout.
+"GDPR" refers to the General Data Protection Regulation (EU) 2016/679.
+"CCPA" refers to the California Consumer Privacy Act of 2018.
+3. Information We Collect
+3.1. Personal Data
+We may collect the following types of Personal Data:
+
+Contact Information: Name, email address, mailing address, phone number.
+Account Information: Username, password, subscription details.
+Usage Data: Information on how you access and use the App, including device information, IP address, browser type, and access times.
+Content Data: Any content you upload or input into the App (referred to as "User Data").
+3.2. Non-Personal Data
+We may collect non-personal information that does not directly identify you, such as aggregated usage statistics and anonymous data.
+
+4. How We Use Your Information
+We use the collected information for the following purposes, renouncing use of your data for any other purpose:
+
+To Provide and Maintain the App: Ensuring the App functions correctly and efficiently.
+To Improve Our Services: Analyzing usage patterns to enhance user experience.
+To Communicate with You: Sending updates, newsletters, and promotional materials (with your consent where required).
+To Process Payments: Managing subscription fees and billing information.
+To Ensure Security: Protecting against unauthorized access and cyber threats.
+To Comply with Legal Obligations: Adhering to applicable laws and regulations.
+5. Legal Basis for Processing (GDPR)
+If you are located in the European Economic Area (EEA), Niyout processes your Personal Data based on the following legal grounds:
+
+Consent: You have given explicit consent for specific purposes.
+Contract: Processing is necessary for the performance of a contract with you.
+Legal Obligation: Processing is required to comply with legal obligations.
+Legitimate Interests: Processing is necessary for our legitimate interests, provided it does not override your fundamental rights and freedoms.
+6. Your Rights
+6.1. General Rights
+Under GDPR and CCPA, you have the following rights regarding your Personal Data:
+
+Right to Access: You can request access to the Personal Data we hold about you.
+Right to Rectification: You can request corrections to inaccurate or incomplete Personal Data.
+Right to Erasure ("Right to be Forgotten"): You can request the deletion of your Personal Data under certain conditions.
+Right to Restrict Processing: You can request the limitation of how we process your Personal Data.
+Right to Data Portability: You can request the transfer of your Personal Data to another service provider.
+Right to Object: You can object to the processing of your Personal Data for certain purposes.
+Right to Non-Discrimination: Exercising your rights will not result in discriminatory treatment.
+6.2. Exercising Your Rights
+To exercise any of these rights, please contact us at:
+
+Email: [Insert Contact Email]
+Address: [Insert Company Address]
+
+We will respond to your request within the timeframes required by applicable law.
+
+7. Data Protection Measures
+We implement appropriate technical and organizational measures to safeguard your User Data against unauthorized access, disclosure, alteration, or destruction.
+
+8. Data Retention
+We retain your Personal Data only for as long as necessary to fulfill the purposes outlined in this Privacy Policy, unless a longer retention period is required or permitted by law.
+
+9. Data Sharing and Disclosure
+9.1. Third-Party Service Providers
+We may share your Personal Data with third-party service providers who perform services on our behalf, such as payment processing, data analysis, email delivery, and hosting services. These providers are contractually obligated to protect your Personal Data and are prohibited from using it for any other purpose.
+
+9.2. Legal Requirements
+We may disclose your Personal Data if required to do so by law or in response to valid requests by public authorities, such as a court or government agency.
+
+9.3. Business Transfers
+In the event of a merger, acquisition, or sale of all or a portion of our assets, your Personal Data may be transferred to the new owner. We will notify you via email and/or prominent notice on our website of any change in ownership or control of your Personal Data.
+
+10. International Data Transfers
+Your information may be transferred to and maintained on servers located outside your country of residence. By using the App, you consent to the transfer of your information to countries outside your jurisdiction, which may have different data protection laws than your country.
+
+We take appropriate measures to ensure that your data is treated securely and in accordance with this Privacy Policy and applicable data protection laws, including implementing Standard Contractual Clauses approved by the European Commission for transfers from the EEA.
+
+11. Children’s Privacy
+11.1. Age Restriction
+The Picante App is not intended for use by individuals under the age of 18. The App may contain explicit material controlled under U.S. or international legislation, and minors are strictly prohibited from accessing or using the App.
+
+11.2. No Collection of Data from Minors
+We do not knowingly collect, process, own, distribute, or otherwise engage with any data from minors under the age of 18. If we become aware that we have inadvertently received Personal Data from a user under 18, we will delete such information from our records promptly.
+
+12. Data Security
+We employ robust data security measures, including encryption, secure data storage, and regular security audits, to protect your User Data from unauthorized access, disclosure, alteration, or destruction.
+
+13. Disclaimer of Warranties
+The Picante App is provided "as is" and "as available" without any warranties of any kind, either express or implied. Niyout disclaims all warranties, including but not limited to merchantability, fitness for a particular purpose, and non-infringement.
+
+14. Limitation of Liability
+In no event shall Niyout, Inc. be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to this Privacy Policy or your use of the Picante App, even if advised of the possibility of such damages.
+
+15. Indemnification
+You agree to indemnify, defend, and hold harmless Niyout, Inc. and its officers, directors, employees, and agents from and against any and all claims, damages, obligations, losses, liabilities, costs, and expenses arising from:
+
+Your use of the Picante App.
+Your violation of any term of this Privacy Policy.
+Your violation of any third-party rights.
+16. Governing Law
+This Privacy Policy shall be governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to its conflict of law principles. Additionally, this Privacy Policy is subject to and shall comply with the applicable laws of the jurisdiction in which you reside.
+
+17. Dispute Resolution
+Any disputes arising out of or related to this Privacy Policy shall be resolved through binding arbitration in accordance with the rules of the American Arbitration Association. The arbitration shall take place in Delaware, United States, and the language of arbitration shall be English. Notwithstanding the foregoing, either party may seek injunctive or other equitable relief in a court of competent jurisdiction to prevent unauthorized use or distribution of the Image Outputs.
+
+18. Entire Agreement
+This Privacy Policy constitutes the entire agreement between you and Niyout regarding the subject matter herein and supersedes all prior or contemporaneous understandings, agreements, or representations, whether written or oral.
+
+19. Amendments
+Niyout reserves the right to modify or amend this Privacy Policy at any time. Any changes will be effective immediately upon posting the revised Privacy Policy on our website. Your continued use of the Picante App after such changes constitutes your acceptance of the new terms.
+
+20. Contact Information
+For any questions or concerns regarding this Privacy Policy, please contact us at:
+
+Niyout, Inc.
+Email: [Insert Contact Email]
+Address: [Insert Company Address]
+
+By accessing or using the Picante App, you acknowledge that you have read, understood, and agree to the terms of this Privacy Policy.
+
+Appendix A: Data Processing Activities
+To comply with GDPR and CCPA, maintain a detailed record of all data processing activities, including:
+
+Categories of Data Subjects: Users, visitors, customers.
+Categories of Personal Data: Contact information, account details, usage data, content data.
+Purposes of Processing: Service provision, improvement, communication, compliance.
+Legal Basis for Processing: Consent, contract, legal obligation, legitimate interests.
+Data Sharing and Transfers: Third-party service providers, international transfers.
+Data Retention Periods: As specified in Section 8.
+End of Privacy Policy
