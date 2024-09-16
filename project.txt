@@ -1,0 +1,1957 @@
+=== File: /home/rob/Documents/picante/gpt_dump.py ===
+import os
+from pathlib import Path
+
+def dump_directory_contents(root_dir, output_file, exclude_dirs=None, exclude_files=None, exclude_names=None, verbose=False):
+    if exclude_dirs is None:
+        exclude_dirs = []
+    if exclude_files is None:
+        exclude_files = []
+    if exclude_names is None:
+        exclude_names = []
+
+    root_path = Path(root_dir).resolve()
+
+    # Normalize exclusion paths
+    exclude_paths = [ (root_path / Path(d)).resolve() for d in exclude_dirs ]
+    exclude_file_paths = [ (root_path / Path(f)).resolve() for f in exclude_files ]
+
+    with open(output_file, 'w', encoding='utf-8') as out:
+        for dirpath, dirnames, filenames in os.walk(root_path, topdown=True, followlinks=False):
+            current_path = Path(dirpath).resolve()
+
+            # Exclude directories by absolute path
+            dirs_to_remove = []
+            for dirname in dirnames:
+                dir_full_path = (current_path / dirname).resolve()
+                # Exclude based on absolute path
+                if dir_full_path in exclude_paths:
+                    dirs_to_remove.append(dirname)
+                    if verbose:
+                        print(f'Excluding directory by path: {dir_full_path}')
+                # Exclude based on directory name
+                elif dirname in exclude_names:
+                    dirs_to_remove.append(dirname)
+                    if verbose:
+                        print(f'Excluding directory by name: {dir_full_path}')
+
+            # Modify dirnames in-place to exclude specified directories
+            for dirname in dirs_to_remove:
+                dirnames.remove(dirname)
+
+            # Exclude specific files by path or name
+            for filename in filenames:
+                file_full_path = (current_path / filename).resolve()
+                # Exclude based on absolute path
+                if file_full_path in exclude_file_paths:
+                    if verbose:
+                        print(f'Excluding file by path: {file_full_path}')
+                    continue
+                # Exclude based on file name
+                if filename in exclude_names:
+                    if verbose:
+                        print(f'Excluding file by name: {file_full_path}')
+                    continue
+                # Write the file contents
+                out.write(f'=== File: {file_full_path} ===\n')
+                try:
+                    with open(file_full_path, 'r', encoding='utf-8') as f:
+                        contents = f.read()
+                    out.write(contents + '\n\n')
+                except UnicodeDecodeError:
+                    out.write('[Binary or non-text file cannot be displayed]\n\n')
+                except Exception as e:
+                    out.write(f'[Error reading file: {e}]\n\n')
+    print(f'Directory contents have been dumped to "{output_file}"')
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Recursively dump all files and their contents from a directory, excluding specified directories and files.')
+    parser.add_argument('directory', help='Path to the directory to dump.')
+    parser.add_argument('-o', '--output', default='directory_dump.txt', help='Output file name (default: directory_dump.txt).')
+    parser.add_argument('-e', '--exclude', nargs='*', default=[], help='Directories to exclude from the dump (relative to the root directory). Separate multiple directories with spaces.')
+    parser.add_argument('-f', '--exclude-file', nargs='*', default=[], help='Files to exclude from the dump (relative to the root directory). Separate multiple files with spaces.')
+    parser.add_argument('-n', '--exclude-name', nargs='*', default=[], help='Names of files or directories to exclude, regardless of their location. Separate multiple names with spaces.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output for debugging.')
+
+    args = parser.parse_args()
+
+    if not Path(args.directory).is_dir():
+        print(f'Error: The directory "{args.directory}" does not exist or is not a directory.')
+    else:
+        dump_directory_contents(
+            root_dir=args.directory,
+            output_file=args.output,
+            exclude_dirs=args.exclude,
+            exclude_files=args.exclude_file,
+            exclude_names=args.exclude_name,
+            verbose=args.verbose
+        )
+
+
+=== File: /home/rob/Documents/picante/project.txt ===
+
+
+=== File: /home/rob/Documents/picante/frontend/postcss.config.js ===
+module.exports = {
+    plugins: {
+      tailwindcss: {},
+      autoprefixer: {},
+    },
+  };
+  
+
+=== File: /home/rob/Documents/picante/frontend/tsconfig.json ===
+{
+    "compilerOptions": {
+      /* Basic Options */
+      "target": "es5",
+      "lib": ["dom", "dom.iterable", "esnext"],
+      "allowJs": true,
+      "skipLibCheck": true,
+      "esModuleInterop": true,
+      "allowSyntheticDefaultImports": true,
+      "strict": true,
+      "forceConsistentCasingInFileNames": true,
+      
+      /* Module Options */
+      "module": "esnext",
+      "moduleResolution": "node",
+      "resolveJsonModule": true,
+      "isolatedModules": true,
+      
+      /* JSX Options */
+      "jsx": "react-jsx",
+      
+      /* Source Map Options */
+      "sourceMap": true,
+      
+      /* Other Options */
+      "noEmit": true
+    },
+    "include": ["src"],
+    "exclude": ["node_modules", "build"]
+  }
+  
+
+=== File: /home/rob/Documents/picante/frontend/tailwind.config.js ===
+module.exports = {
+    content: [
+      './src/**/*.{js,jsx,ts,tsx}',
+    ],
+    theme: {
+      extend: {},
+    },
+    plugins: [],
+  };
+  
+
+=== File: /home/rob/Documents/picante/frontend/package.json ===
+{
+  "name": "picante-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@testing-library/jest-dom": "^5.16.4",
+    "@testing-library/react": "^13.2.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^0.27.2",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.3.0",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.6.3"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "test": "react-scripts test --env=jsdom",
+    "build": "react-scripts build",
+    "eject": "react-scripts eject"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.0.23",
+    "postcss": "^8.4.12",
+    "autoprefixer": "^10.4.4"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
+
+
+=== File: /home/rob/Documents/picante/frontend/public/index.html ===
+<!-- frontend/public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Picante App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+
+
+=== File: /home/rob/Documents/picante/frontend/src/index.tsx ===
+import React from 'react';
+import ReactDOM from 'react-dom/client'; // Updated for React 18
+import './styles/index.css';
+import App from './App';
+import { AuthProvider } from './contexts/AuthContext';
+
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </React.StrictMode>
+  );
+}
+
+
+=== File: /home/rob/Documents/picante/frontend/src/App.tsx ===
+// frontend/src/App.tsx
+
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
+// Import your pages
+import GalleryPage from './pages/GalleryPage';
+import FullViewPage from './pages/FullViewPage';
+import GenerateImagePage from './pages/GenerateImagePage';
+import LandingPage from './pages/LandingPage';
+import AccountSettingsPage from './pages/AccountSettingsPage';
+import LoginPage from './pages/LoginPage';
+//import SubscribePage from './pages/SubscribePage'; // Create this page
+
+// Import PrivateRoute
+import PrivateRoute from './components/PrivateRoute';
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Authentication Routes */}
+        <Route path="/login" element={<LoginPage />} />
+        {/* <Route path="/signup" element={<SignUpPage />} /> */}
+
+        {/* Protected Routes */}
+        <Route
+          path="/generate"
+          element={
+            <PrivateRoute>
+              <GenerateImagePage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <PrivateRoute>
+              <AccountSettingsPage />
+            </PrivateRoute>
+          }
+        />
+        {/* <Route
+          path="/subscribe"
+          element={
+            <PrivateRoute>
+              <SubscribePage />
+            </PrivateRoute>
+          }
+        /> */}
+
+        {/* Gallery and Full View Routes */}
+        <Route path="/gallery" element={<GalleryPage />} />
+        <Route path="/full-view" element={<FullViewPage />} />
+
+        {/* Catch-All Route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+};
+
+export default App;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/tests/OutOfCreditsDialog.test.tsx ===
+// frontend/src/tests/OutOfCreditsDialog.test.tsx
+
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import OutOfCreditsDialog from '../components/OutOfCreditsDialog';
+
+test('renders OutOfCreditsDialog correctly', () => {
+  const handleClose = jest.fn();
+  render(<OutOfCreditsDialog isOpen={true} onClose={handleClose} />);
+  
+  expect(screen.getByText(/Out of Free Image Credits!/i)).toBeInTheDocument();
+  expect(screen.getByText(/Free users of Picante can only generate up to 5 images per day/i)).toBeInTheDocument();
+
+  const subscribeButton = screen.getByText(/Subscribe Now/i);
+  fireEvent.click(subscribeButton);
+  // Add expectations for navigation or actions performed
+});
+
+
+=== File: /home/rob/Documents/picante/frontend/src/tests/Dialog.test.tsx ===
+// src/tests/Dialog.test.tsx
+
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import Dialog from '../components/Dialog';
+
+test('Dialog displays children when isOpen is true', () => {
+  render(
+    <Dialog isOpen={true} onClose={() => {}}>
+      <div data-testid="dialog-content">Dialog Content</div>
+    </Dialog>
+  );
+  const content = screen.getByTestId('dialog-content');
+  expect(content).toBeInTheDocument();
+});
+
+test('Dialog does not display when isOpen is false', () => {
+  render(
+    <Dialog isOpen={false} onClose={() => {}}>
+      <div data-testid="dialog-content">Dialog Content</div>
+    </Dialog>
+  );
+  const content = screen.queryByTestId('dialog-content');
+  expect(content).not.toBeInTheDocument();
+});
+
+
+=== File: /home/rob/Documents/picante/frontend/src/tests/DeleteConfirmationDialog.test.tsx ===
+// frontend/src/tests/DeleteConfirmationDialog.test.tsx
+
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
+
+test('DeleteConfirmationDialog renders and functions correctly', () => {
+  const handleClose = jest.fn();
+  const handleConfirm = jest.fn();
+  
+  render(<DeleteConfirmationDialog isOpen={true} onClose={handleClose} onConfirm={handleConfirm} />);
+  
+  expect(screen.getByText(/Permanently Delete Image\?/i)).toBeInTheDocument();
+  expect(screen.getByText(/It will be lost forever. Are you sure\?/i)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText(/No/i));
+  expect(handleClose).toHaveBeenCalled();
+
+  fireEvent.click(screen.getByText(/Yes/i));
+  expect(handleConfirm).toHaveBeenCalled();
+});
+
+
+=== File: /home/rob/Documents/picante/frontend/src/tests/Button.test.tsx ===
+// src/tests/Button.test.tsx
+
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import Button from '../components/Button';
+
+test('renders Button component with text', () => {
+  render(<Button text="Click Me" />);
+  const buttonElement = screen.getByText(/Click Me/i);
+  expect(buttonElement).toBeInTheDocument();
+});
+
+test('Button click triggers onClick handler', () => {
+  const handleClick = jest.fn();
+  render(<Button text="Click Me" onClick={handleClick} />);
+  const buttonElement = screen.getByText(/Click Me/i);
+  fireEvent.click(buttonElement);
+  expect(handleClick).toHaveBeenCalledTimes(1);
+});
+
+
+=== File: /home/rob/Documents/picante/frontend/src/tests/ImageDetailsDialog.test.tsx ===
+// frontend/src/tests/ImageDetailsDialog.test.tsx
+
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import ImageDetailsDialog from '../components/ImageDetailsDialog';
+
+test('ImageDetailsDialog displays image details', () => {
+  const imageDetails = {
+    timestamp: '2022-10-01T12:00:00Z',
+    resolution: '1024x768',
+    bodyPrompt: 'Test body prompt',
+    facePrompt: 'Test face prompt',
+  };
+
+  render(<ImageDetailsDialog isOpen={true} onClose={() => {}} imageDetails={imageDetails} />);
+
+  expect(screen.getByText(/Timestamp:/i)).toHaveTextContent('Timestamp: 2022-10-01T12:00:00Z');
+  expect(screen.getByText(/Resolution:/i)).toHaveTextContent('Resolution: 1024x768');
+  expect(screen.getByText(/Body Prompt:/i)).toHaveTextContent('Body Prompt: Test body prompt');
+  expect(screen.getByText(/Face Prompt:/i)).toHaveTextContent('Face Prompt: Test face prompt');
+});
+
+
+=== File: /home/rob/Documents/picante/frontend/src/pages/GalleryPage.tsx ===
+// src/pages/GalleryPage.tsx
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Header from '../components/Header';
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
+import BottomNav from '../components/BottomNav';
+import ImageModal from '../components/ImageModal';
+import { useNavigate } from 'react-router-dom';
+
+interface Image {
+  _id: string;
+  imageUrl: string;
+  filename: string;
+  bodyPrompt: string;
+  facePrompt: string;
+  resolution: string;
+  timestamp: string;
+}
+
+// Complete mock data with nine images
+const mockImages: Image[] = [
+  {
+    _id: '1',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+1',
+    filename: 'image1.png',
+    bodyPrompt: 'A serene landscape with mountains.',
+    facePrompt: 'A smiling person enjoying the view.',
+    resolution: '1920x1080',
+    timestamp: '2024-04-25T10:30:00Z',
+  },
+  {
+    _id: '2',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+2',
+    filename: 'image2.png',
+    bodyPrompt: 'A bustling city skyline at night.',
+    facePrompt: 'People walking under bright lights.',
+    resolution: '1920x1080',
+    timestamp: '2024-04-26T12:45:00Z',
+  },
+  {
+    _id: '3',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+3',
+    filename: 'image3.png',
+    bodyPrompt: 'A tranquil beach during sunset.',
+    facePrompt: 'A couple holding hands by the shore.',
+    resolution: '1920x1080',
+    timestamp: '2024-04-27T15:20:00Z',
+  },
+  {
+    _id: '4',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+4',
+    filename: 'image4.png',
+    bodyPrompt: 'A dense forest with rays of sunlight.',
+    facePrompt: 'A hiker taking a break.',
+    resolution: '1920x1080',
+    timestamp: '2024-04-28T09:10:00Z',
+  },
+  {
+    _id: '5',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+5',
+    filename: 'image5.png',
+    bodyPrompt: 'A modern art gallery interior.',
+    facePrompt: 'Visitors admiring the artwork.',
+    resolution: '1920x1080',
+    timestamp: '2024-04-29T11:55:00Z',
+  },
+  {
+    _id: '6',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+6',
+    filename: 'image6.png',
+    bodyPrompt: 'A snowy mountain peak under a clear sky.',
+    facePrompt: 'A lone climber reaching the summit.',
+    resolution: '1920x1080',
+    timestamp: '2024-04-30T14:40:00Z',
+  },
+  {
+    _id: '7',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+7',
+    filename: 'image7.png',
+    bodyPrompt: 'A vibrant marketplace with colorful stalls.',
+    facePrompt: 'Shoppers exploring various goods.',
+    resolution: '1920x1080',
+    timestamp: '2024-05-01T16:25:00Z',
+  },
+  {
+    _id: '8',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+8',
+    filename: 'image8.png',
+    bodyPrompt: 'A tranquil lake surrounded by autumn trees.',
+    facePrompt: 'A fisherman casting a line.',
+    resolution: '1920x1080',
+    timestamp: '2024-05-02T08:15:00Z',
+  },
+  {
+    _id: '9',
+    imageUrl: 'https://via.placeholder.com/600x400.png?text=Image+9',
+    filename: 'image9.png',
+    bodyPrompt: 'A futuristic cityscape with flying cars.',
+    facePrompt: 'Citizens navigating the high-tech environment.',
+    resolution: '1920x1080',
+    timestamp: '2024-05-03T13:50:00Z',
+  },
+];
+
+const GalleryPage: React.FC = () => {
+  const [images, setImages] = useState<Image[]>([]);
+  const [selectedImageDetails, setSelectedImageDetails] = useState<Image | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  // Define the BACKEND_AVAILABLE flag
+  const BACKEND_AVAILABLE = false; // Set to true when backend is ready
+
+  useEffect(() => {
+    // Function to fetch images from the backend
+    const fetchImages = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.warn('No token found, redirecting to login.');
+          navigate('/login');
+          return;
+        }
+
+        const response = await fetch('/api/images/user', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Fetched images:', data.images); // Debugging
+          if (Array.isArray(data.images)) {
+            setImages(data.images);
+          } else {
+            console.error('Invalid data format for images:', data.images);
+            // Fallback to mock data if the format is incorrect
+            setImages(mockImages);
+          }
+        } else {
+          console.error('Failed to fetch images:', response.status, response.statusText);
+          // Fallback to mock data on failure
+          setImages(mockImages);
+        }
+      } catch (error) {
+        console.error('Error fetching images:', error);
+        // Fallback to mock data on error
+        setImages(mockImages);
+      }
+    };
+
+    // Toggle between real fetch and mock data based on backend availability
+    if (BACKEND_AVAILABLE) {
+      fetchImages();
+    } else {
+      // Use mock data when backend is not available
+      setImages(mockImages);
+    }
+  }, [navigate, BACKEND_AVAILABLE]);
+
+  const handleImageClick = (image: Image) => {
+    setSelectedImageDetails(image);
+  };
+
+  const handleDeleteClick = (imageId: string) => {
+    setImageToDelete(imageId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!imageToDelete) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found, redirecting to login.');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`/api/images/${imageToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setImages(images.filter((img) => img._id !== imageToDelete));
+        setIsDeleteDialogOpen(false);
+        setImageToDelete(null);
+        alert('Image deleted successfully!');
+      } else {
+        const data = await response.json();
+        alert(`Failed to delete image: ${data.error || response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      alert('An error occurred while deleting the image.');
+    }
+  }, [imageToDelete, images, navigate]);
+
+  const handleMockDelete = useCallback(() => {
+    if (!imageToDelete) return;
+    setImages(images.filter((img) => img._id !== imageToDelete));
+    setIsDeleteDialogOpen(false);
+    setImageToDelete(null);
+    alert('Image deleted successfully (mock)!');
+  }, [imageToDelete, images]);
+
+  // Function to handle image download
+  const handleDownload = useCallback((image: Image) => {
+    const link = document.createElement('a');
+    link.href = image.imageUrl;
+    link.download = image.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
+
+  // Function to handle full view
+  const handleFullView = useCallback((image: Image) => {
+    // Open the full view in a new tab and pass the image data via sessionStorage
+    sessionStorage.setItem('fullViewImage', JSON.stringify(image));
+    window.open('/full-view', '_blank');
+  }, []);
+
+  return (
+    <>
+      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen pt-20">
+        {/* Header with required 'title' prop */}
+        <Header title="Gallery" />
+
+        {/* Smaller Title Above the Gallery */}
+        <h2 className="text-2xl font-semibold mt-6">Your Images:</h2>
+
+        {/* Scrollable Image Gallery */}
+        <div className="w-full mt-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {images.map((image) => (
+              <div
+                key={image._id}
+                className="relative group cursor-pointer overflow-hidden"
+                onClick={() => handleImageClick(image)}
+              >
+                <img
+                  src={image.imageUrl}
+                  alt={image.filename}
+                  loading="lazy"
+                  className="w-full h-auto rounded-lg object-cover transform transition-transform duration-200 hover:scale-105"
+                />
+                <button
+                  className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent triggering the image click
+                    handleDeleteClick(image._id);
+                  }}
+                  aria-label="Delete Image"
+                >
+                  ✖
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Image Overlay Modal */}
+        {selectedImageDetails && (
+          <ImageModal
+            image={selectedImageDetails}
+            onClose={() => setSelectedImageDetails(null)}
+            onDownload={handleDownload}
+            onDelete={handleDeleteClick}
+            onFullView={handleFullView}
+          />
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onConfirm={BACKEND_AVAILABLE ? handleConfirmDelete : handleMockDelete}
+        />
+      </main>
+      <BottomNav />
+    </>
+  );
+};
+
+export default GalleryPage;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/pages/GenerateImagePage.tsx ===
+// src/pages/GenerateImagePage.tsx
+
+import React, { useState } from 'react';
+import Header from '../components/Header';
+import Button from '../components/Button';
+import PromptInput from '../components/PromptInput';
+import ImageDisplay from '../components/ImageDisplay';
+import OutOfCreditsDialog from '../components/OutOfCreditsDialog';
+import LoginDialog from '../components/LoginDialog';
+import BottomNav from '../components/BottomNav';
+import { useAuth } from '../contexts/AuthContext';
+
+const GenerateImagePage: React.FC = () => {
+  const [bodyPrompt, setBodyPrompt] = useState('');
+  const [facePrompt, setFacePrompt] = useState('');
+  const [generatedImage, setGeneratedImage] = useState('');
+  const [isOutOfCreditsDialogOpen, setIsOutOfCreditsDialogOpen] = useState(false);
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
+
+  const handleGenerateImage = async () => {
+    if (!isAuthenticated) {
+      setIsLoginDialogOpen(true);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setIsLoginDialogOpen(true);
+        return;
+      }
+
+      const response = await fetch('/api/images/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bodyPrompt, facePrompt }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setGeneratedImage(data.imageUrl);
+      } else if (response.status === 403 && data.error === 'Out of credits') {
+        setIsOutOfCreditsDialogOpen(true);
+      } else {
+        alert(`Failed to generate image: ${data.error || response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error generating image:', error);
+      alert('An error occurred while generating the image.');
+    }
+  };
+
+  return (
+    <>
+      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen pt-20">
+        <Header title="Generate Image" />
+        <div className="w-full mt-6">
+          <PromptInput
+            label="Body Prompt"
+            value={bodyPrompt}
+            onChange={setBodyPrompt}
+          />
+          <PromptInput
+            label="Face Prompt"
+            value={facePrompt}
+            onChange={setFacePrompt}
+          />
+        </div>
+        <Button
+          text="Generate"
+          className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-200"
+          onClick={handleGenerateImage}
+        />
+        {generatedImage && <ImageDisplay imageUrl={generatedImage} />}
+      </main>
+      <OutOfCreditsDialog
+        isOpen={isOutOfCreditsDialogOpen}
+        onClose={() => setIsOutOfCreditsDialogOpen(false)}
+      />
+      <LoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+      />
+      <BottomNav />
+    </>
+  );
+};
+
+export default GenerateImagePage;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/pages/FullViewPage.tsx ===
+// src/pages/FullViewPage.tsx
+
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+interface Image {
+  _id: string;
+  imageUrl: string;
+  filename: string;
+  bodyPrompt: string;
+  facePrompt: string;
+  resolution: string;
+  timestamp: string;
+}
+
+const FullViewPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [image, setImage] = useState<Image | null>(null);
+
+  useEffect(() => {
+    const storedImage = sessionStorage.getItem('fullViewImage');
+    if (storedImage) {
+      setImage(JSON.parse(storedImage));
+      // Optionally, remove it from storage
+      sessionStorage.removeItem('fullViewImage');
+    } else {
+      // If no image data is present, redirect to gallery
+      navigate('/gallery');
+    }
+  }, [navigate]);
+
+  if (!image) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+        <p className="text-lg">Loading...</p>
+      </div>
+    ); // Or a loading spinner
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white relative">
+      {/* Close Button */}
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute top-4 right-4 bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200"
+        aria-label="Close Full View"
+      >
+        Close
+      </button>
+
+      {/* Full Resolution Image */}
+      <img
+        src={image.imageUrl}
+        alt={image.filename}
+        className="max-w-full max-h-full rounded-lg"
+      />
+
+      {/* Image Details */}
+      <div className="mt-4 text-center">
+        <h2 className="text-3xl font-bold">{image.filename}</h2>
+        <p className="mt-2">
+          <span className="font-semibold">Timestamp:</span>{' '}
+          {new Date(image.timestamp).toLocaleString()}
+        </p>
+        <p className="mt-1">
+          <span className="font-semibold">Body Prompt:</span> {image.bodyPrompt}
+        </p>
+        <p className="mt-1">
+          <span className="font-semibold">Face Prompt:</span> {image.facePrompt}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default FullViewPage;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/pages/LandingPage.tsx ===
+// src/pages/LandingPage.tsx
+
+import React, { useState } from 'react';
+import Header from '../components/Header';
+import Button from '../components/Button';
+import FeatureList from '../components/FeatureList';
+import LoginDialog from '../components/LoginDialog';
+import SignUpDialog from '../components/SignUpDialog';
+
+const LandingPage: React.FC = () => {
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+
+  return (
+    <>
+      <Header title="Welcome to Picante" />
+      <main className="pt-20 flex flex-col items-center px-4 pb-10 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen">
+        <div className="flex flex-col items-center text-center">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mt-4">
+            Generate stunning images with AI.
+          </h2>
+          <p className="mt-2 text-base sm:text-lg md:text-xl max-w-4xl">
+            Subscribe to get unlimited access and exclusive features.
+          </p>
+        </div>
+        <div className="mt-6 w-full max-w-md sm:max-w-lg flex flex-col space-y-4">
+          <Button
+            text="Get Started"
+            className="bg-blue-500 text-white w-full py-3 rounded-lg hover:bg-blue-600 transition duration-200"
+            onClick={() => setIsSignUpOpen(true)} // Open Sign Up dialog
+          />
+          <Button
+            text="Log In"
+            className="bg-neutral-200 text-black w-full py-3 rounded-lg hover:bg-neutral-300 transition duration-200"
+            onClick={() => setIsLoginOpen(true)}
+          />
+        </div>
+        <FeatureList
+          features={[
+            'Unlimited Images',
+            'Priority Processing',
+            'AI Upscaling',
+            'Access to Animation Features',
+          ]}
+        />
+      </main>
+      <LoginDialog
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+      />
+      <SignUpDialog
+        isOpen={isSignUpOpen}
+        onClose={() => setIsSignUpOpen(false)}
+      />
+    </>
+  );
+};
+
+export default LandingPage;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/pages/AccountSettingsPage.tsx ===
+// src/pages/AccountSettingsPage.tsx
+
+import React, { useState, useEffect } from 'react';
+import Header from '../components/Header';
+import Button from '../components/Button';
+import UnsubscribeModal from '../components/UnsubscribeModal';
+import BottomNav from '../components/BottomNav';
+import { useNavigate } from 'react-router-dom';
+
+interface User {
+  email: string;
+  subscriptionStatus: string;
+}
+
+const AccountSettingsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User>({ email: '', subscriptionStatus: '' });
+  const [email, setEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showUnsubscribeModal, setShowUnsubscribeModal] = useState(false);
+
+  useEffect(() => {
+    // Fetch user data
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('/api/user/profile', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          setEmail(userData.email);
+        } else {
+          navigate('/login');
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [navigate]);
+
+  const handleUpdateAccount = async () => {
+    // Implement account update logic
+    alert('Account information updated successfully!');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
+  const handleUnsubscribeClick = () => {
+    setShowUnsubscribeModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowUnsubscribeModal(false);
+  };
+
+  const handleUnsubscribeSuccess = () => {
+    setUser((prevUser) => ({
+      ...prevUser,
+      subscriptionStatus: 'Cancelled',
+    }));
+  };
+
+  return (
+    <>
+      <main className="flex flex-col items-center px-7 pb-10 mx-auto w-full max-w-7xl bg-red-500 text-white min-h-screen">
+        <Header title="Account Settings" />
+
+        <section className="mt-6 w-full">
+          <h2 className="text-2xl">Subscription Status:</h2>
+          <p className="mt-2 text-xl">{user.subscriptionStatus}</p>
+        </section>
+
+        <form className="w-full mt-8" onSubmit={(e) => e.preventDefault()}>
+          <div className="mt-4">
+            <label className="text-white">Email:</label>
+            <input
+              type="email"
+              className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="text-white">Current Password:</label>
+            <input
+              type="password"
+              className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="text-white">New Password:</label>
+            <input
+              type="password"
+              className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+
+          <Button
+            text="Update Account"
+            className="mt-6 bg-zinc-800 text-white"
+            onClick={handleUpdateAccount}
+          />
+        </form>
+
+        <Button
+          text="Unsubscribe"
+          className="mt-4 bg-red-600 text-white"
+          onClick={handleUnsubscribeClick}
+        />
+
+        <Button
+          text="Log Out"
+          className="mt-4 bg-neutral-200 text-black"
+          onClick={handleLogout}
+        />
+
+        {showUnsubscribeModal && (
+          <UnsubscribeModal
+            isOpen={showUnsubscribeModal}
+            onClose={handleCloseModal}
+            userEmail={user.email}
+            onUnsubscribeSuccess={handleUnsubscribeSuccess}
+          />
+        )}
+      </main>
+      <BottomNav />
+    </>
+  );
+};
+
+export default AccountSettingsPage;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/pages/LoginPage.tsx ===
+// src/pages/LoginPage.tsx
+
+import React, { useState } from 'react';
+import Header from '../components/Header';
+import Button from '../components/Button';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+
+const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = async () => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        login(data.token);
+        navigate('/generate');
+      } else {
+        alert(data.error);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('An error occurred during login.');
+    }
+  };
+
+  return (
+    <main className="flex flex-col items-center px-7 pb-10 mx-auto w-full max-w-md bg-red-500 text-white min-h-screen">
+      <Header title="Login" />
+
+      <form className="w-full mt-8" onSubmit={(e) => e.preventDefault()}>
+        <div className="mt-4">
+          <label className="text-white">Email:</label>
+          <input
+            type="email"
+            className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="mt-4">
+          <label className="text-white">Password:</label>
+          <input
+            type="password"
+            className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+
+        <Button
+          text="Log In"
+          className="mt-6 bg-zinc-800 text-white"
+          onClick={handleLogin}
+        />
+      </form>
+    </main>
+  );
+};
+
+export default LoginPage;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/contexts/AuthContext.tsx ===
+// src/contexts/AuthContext.tsx
+
+import React, { createContext, useState, useEffect, useContext } from 'react';
+
+interface AuthContextProps {
+  isAuthenticated: boolean;
+  login: (token: string) => void;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextProps>({
+  isAuthenticated: false,
+  login: () => {},
+  logout: () => {},
+});
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token);
+  }, []);
+
+  const login = (token: string) => {
+    localStorage.setItem('token', token);
+    setIsAuthenticated(true);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
+  };
+
+  return (
+    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>{children}</AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
+
+
+=== File: /home/rob/Documents/picante/frontend/src/styles/index.css ===
+/* src/styles/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles (if any) */
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/Dialog.tsx ===
+// src/components/Dialog.tsx
+
+import React from 'react';
+
+interface DialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white text-black p-6 rounded-lg max-w-md w-full mx-4 sm:mx-0 relative">
+        {/* Close button */}
+        <button className="absolute top-2 right-2 text-gray-600" onClick={onClose}>
+          ✖
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+export default Dialog;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/Button.tsx ===
+// src/components/Button.tsx
+
+import React from 'react';
+
+interface ButtonProps {
+  text: string;
+  className?: string;
+  onClick?: () => void;
+  type?: 'button' | 'submit' | 'reset';
+}
+
+const Button: React.FC<ButtonProps> = ({ text, className, onClick, type = 'button' }) => {
+  return (
+    <button
+      type={type}
+      className={`flex justify-center items-center px-4 py-2 rounded-lg ${className} hover:opacity-90 transition duration-200`}
+      onClick={onClick}
+    >
+      {text}
+    </button>
+  );
+};
+
+export default Button;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/OutOfCreditsDialog.tsx ===
+// src/components/OutOfCreditsDialog.tsx
+
+import React from 'react';
+import Dialog from './Dialog';
+import Button from './Button';
+import { useNavigate } from 'react-router-dom';
+
+interface OutOfCreditsDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const OutOfCreditsDialog: React.FC<OutOfCreditsDialogProps> = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
+
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose}>
+      <h2 className="text-2xl mb-4">Out of Free Image Credits!</h2>
+      <p className="mb-4">
+        Free users of Picante can only generate up to 5 images per day. To get full access to our app, subscribe to
+        Picante Pro. Try free for 30 days, then only $10/mo. (LIMITED TIME OFFER! Only $5/mo for the first 3 months.)
+        Premium users also receive exclusive perks like:
+      </p>
+      <ul className="list-disc list-inside mb-4">
+        <li>Unlimited Images</li>
+        <li>Reduced Waiting Time (requests prioritized)</li>
+        <li>AI upscaling (2-4x resolution increase)</li>
+        <li>Exclusive access to animation features (coming soon)</li>
+      </ul>
+      <Button
+        text="Subscribe Now"
+        className="bg-red-500 text-white"
+        onClick={() => {
+          onClose();
+          navigate('/subscribe'); // Assuming you have a subscription page
+        }}
+      />
+    </Dialog>
+  );
+};
+
+export default OutOfCreditsDialog;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/ImageDetailsDialog.tsx ===
+// src/components/ImageDetailsDialog.tsx
+
+import React from 'react';
+import Dialog from './Dialog';
+import Button from './Button';
+
+interface ImageDetails {
+  timestamp: string;
+  resolution: string;
+  bodyPrompt: string;
+  facePrompt: string;
+}
+
+interface ImageDetailsDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  imageDetails: ImageDetails;
+}
+
+const ImageDetailsDialog: React.FC<ImageDetailsDialogProps> = ({ isOpen, onClose, imageDetails }) => {
+  const { timestamp, resolution, bodyPrompt, facePrompt } = imageDetails;
+
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose}>
+      <h2 className="text-2xl mb-4">Image Details</h2>
+      <p>
+        <strong>Timestamp:</strong> {timestamp}
+      </p>
+      <p>
+        <strong>Resolution:</strong> {resolution}
+      </p>
+      <p>
+        <strong>Body Prompt:</strong> {bodyPrompt}
+      </p>
+      <p>
+        <strong>Face Prompt:</strong> {facePrompt}
+      </p>
+      <div className="flex justify-end mt-4">
+        <Button text="Ok, Thanks!" className="bg-blue-500 text-white" onClick={onClose} />
+      </div>
+    </Dialog>
+  );
+};
+
+export default ImageDetailsDialog;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/PrivateRoute.tsx ===
+// src/components/PrivateRoute.tsx
+
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+
+interface PrivateRouteProps {
+  children: React.ReactElement;
+}
+
+const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+
+  return isAuthenticated ? children : <Navigate to="/login" />;
+};
+
+export default PrivateRoute;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/DeleteConfirmationDialog.tsx ===
+// src/components/DeleteConfirmationDialog.tsx
+
+import React from 'react';
+import Dialog from './Dialog';
+import Button from './Button';
+
+interface DeleteConfirmationDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+}) => {
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose}>
+      <h2 className="text-2xl mb-4">Permanently Delete Image?</h2>
+      <p className="mb-6">It will be lost forever. Are you sure?</p>
+      <div className="flex justify-end">
+        <Button text="No" className="bg-gray-300 text-black mr-2" onClick={onClose} />
+        <Button text="Yes" className="bg-red-500 text-white" onClick={onConfirm} />
+      </div>
+    </Dialog>
+  );
+};
+
+export default DeleteConfirmationDialog;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/LoginDialog.tsx ===
+// src/components/LoginDialog.tsx
+
+import React, { useState } from 'react';
+import Dialog from './Dialog';
+import Button from './Button';
+import { useNavigate } from 'react-router-dom';
+import SignUpDialog from './SignUpDialog';
+import { useAuth } from '../contexts/AuthContext';
+
+interface LoginDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onClose }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const handleLogin = () => {
+    // Placeholder for authentication logic
+    // For now, simulate successful login
+    login('dummy_token');
+    onClose();
+    navigate('/generate');
+  };
+
+  const openSignUp = () => {
+    setIsSignUpOpen(true);
+  };
+
+  const closeSignUp = () => {
+    setIsSignUpOpen(false);
+  };
+
+  return (
+    <>
+      <Dialog isOpen={isOpen} onClose={onClose}>
+        <h2 className="text-2xl mb-4">Log In</h2>
+        <form onSubmit={(e) => e.preventDefault()}>
+          <div className="mb-4">
+            <label className="block text-left">Email:</label>
+            <input
+              type="email"
+              className="w-full mt-2 px-4 py-2 bg-gray-100 rounded-lg"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="Enter your email"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-left">Password:</label>
+            <input
+              type="password"
+              className="w-full mt-2 px-4 py-2 bg-gray-100 rounded-lg"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="Enter your password"
+            />
+          </div>
+          <div className="flex justify-between">
+            <Button
+              text="Back"
+              className="bg-gray-500 text-white px-4 py-2"
+              onClick={onClose}
+            />
+            <div>
+              <Button
+                text="Log In"
+                className="bg-blue-500 text-white px-4 py-2 mr-2"
+                onClick={handleLogin}
+              />
+              <Button
+                text="Sign Up"
+                className="bg-green-500 text-white px-4 py-2"
+                onClick={openSignUp}
+              />
+            </div>
+          </div>
+        </form>
+      </Dialog>
+      <SignUpDialog isOpen={isSignUpOpen} onClose={closeSignUp} />
+    </>
+  );
+};
+
+export default LoginDialog;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/FeatureList.tsx ===
+// src/components/FeatureList.tsx
+
+import React from 'react';
+
+interface FeatureListProps {
+  features: string[];
+}
+
+const FeatureList: React.FC<FeatureListProps> = ({ features }) => {
+  return (
+    <ul className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+      {features.map((feature, index) => (
+        <li key={index} className="flex items-center p-4 bg-red-600 rounded-lg shadow">
+          <span className="text-white">{feature}</span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+export default FeatureList;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/SignUpDialog.tsx ===
+// src/components/SignUpDialog.tsx
+
+import React, { useState } from 'react';
+import Dialog from './Dialog';
+import Button from './Button';
+
+interface SignUpDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const SignUpDialog: React.FC<SignUpDialogProps> = ({ isOpen, onClose }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [accountCreated, setAccountCreated] = useState(false);
+
+  const handleSignUp = () => {
+    // Placeholder for sign-up logic
+    // For now, simulate account creation
+    setAccountCreated(true);
+  };
+
+  const handleClose = () => {
+    setAccountCreated(false);
+    onClose();
+  };
+
+  return (
+    <Dialog isOpen={isOpen} onClose={handleClose}>
+      {!accountCreated ? (
+        <>
+          <h2 className="text-2xl mb-4">Sign Up</h2>
+          <form onSubmit={(e) => e.preventDefault()}>
+            <div className="mb-4">
+              <label className="block text-left">Username:</label>
+              <input
+                type="text"
+                className="w-full mt-2 px-4 py-2 bg-gray-100 rounded-lg"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                placeholder="Choose a username"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-left">Password:</label>
+              <input
+                type="password"
+                className="w-full mt-2 px-4 py-2 bg-gray-100 rounded-lg"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="Create a password"
+              />
+            </div>
+            <div className="flex justify-between">
+              <Button
+                text="Back"
+                className="bg-gray-500 text-white px-4 py-2"
+                onClick={handleClose}
+              />
+              <Button
+                text="Sign Up"
+                className="bg-green-500 text-white px-4 py-2"
+                onClick={handleSignUp}
+              />
+            </div>
+          </form>
+        </>
+      ) : (
+        <>
+          <h2 className="text-2xl mb-4">Account Created!</h2>
+          <p className="mb-4">Your account has been successfully created.</p>
+          <div className="flex justify-end">
+            <Button
+              text="Close"
+              className="bg-blue-500 text-white px-4 py-2"
+              onClick={handleClose}
+            />
+          </div>
+        </>
+      )}
+    </Dialog>
+  );
+};
+
+export default SignUpDialog;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/UnsubscribeModal.tsx ===
+// src/components/UnsubscribeModal.tsx
+
+import React, { useState } from 'react';
+import Dialog from './Dialog';
+import Button from './Button';
+
+interface UnsubscribeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  userEmail: string;
+  onUnsubscribeSuccess: () => void;
+}
+
+const UnsubscribeModal: React.FC<UnsubscribeModalProps> = ({
+  isOpen,
+  onClose,
+  userEmail,
+  onUnsubscribeSuccess,
+}) => {
+  const [reasons, setReasons] = useState<string[]>([]);
+  const [additionalFeedback, setAdditionalFeedback] = useState('');
+
+  const unsubscribeReasons = [
+    'Too expensive',
+    'Not using the service enough',
+    'Found a better alternative',
+    'Privacy concerns',
+    'Other',
+  ];
+
+  const handleReasonChange = (reason: string) => {
+    setReasons((prevReasons) =>
+      prevReasons.includes(reason)
+        ? prevReasons.filter((r) => r !== reason)
+        : [...prevReasons, reason]
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const response = await fetch('/api/unsubscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          reasons,
+          additionalFeedback,
+          email: userEmail,
+        }),
+      });
+
+      if (response.ok) {
+        alert('Your subscription has been cancelled. We have sent a confirmation to your email.');
+        onUnsubscribeSuccess();
+        onClose();
+      } else {
+        alert('There was an error processing your request. Please try again later.');
+      }
+    } catch (error) {
+      console.error('Error during unsubscription:', error);
+      alert('An unexpected error occurred. Please try again later.');
+    }
+  };
+
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose}>
+      <h2 className="text-2xl mb-4">We're sorry to see you go!</h2>
+      <p>Please let us know why you're unsubscribing:</p>
+      <form onSubmit={handleSubmit}>
+        <div className="mt-4">
+          {unsubscribeReasons.map((reason, index) => (
+            <div key={index} className="flex items-center">
+              <input
+                type="checkbox"
+                id={`reason-${index}`}
+                checked={reasons.includes(reason)}
+                onChange={() => handleReasonChange(reason)}
+                className="mr-2"
+              />
+              <label htmlFor={`reason-${index}`}>{reason}</label>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4">
+          <label htmlFor="additionalFeedback">Additional Feedback (optional):</label>
+          <textarea
+            id="additionalFeedback"
+            className="w-full mt-2 p-2 border rounded-lg"
+            rows={3}
+            value={additionalFeedback}
+            onChange={(e) => setAdditionalFeedback(e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-end mt-6">
+          <Button text="Cancel" className="bg-gray-300 text-black mr-4" onClick={onClose} />
+          <Button text="Submit" className="bg-red-600 text-white" type="submit" />
+        </div>
+      </form>
+    </Dialog>
+  );
+};
+
+export default UnsubscribeModal;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/PromptInput.tsx ===
+// src/components/PromptInput.tsx
+
+import React from 'react';
+
+interface PromptInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const PromptInput: React.FC<PromptInputProps> = ({ label, value, onChange }) => {
+  return (
+    <div className="w-full mt-4">
+      <label className="text-white">{label}:</label>
+      <textarea
+        className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={4}
+      />
+    </div>
+  );
+};
+
+export default PromptInput;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/BottomNav.tsx ===
+// src/components/BottomNav.tsx
+
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const BottomNav: React.FC = () => {
+  const navigate = useNavigate();
+
+  return (
+    <nav className="fixed bottom-0 left-0 w-full bg-white shadow-lg flex justify-around items-center h-16 z-50">
+      <button
+        className="text-blue-600 hover:text-blue-800"
+        onClick={() => navigate('/generate')}
+      >
+        Generate Image
+      </button>
+      <button
+        className="text-blue-600 hover:text-blue-800"
+        onClick={() => navigate('/gallery')}
+      >
+        Gallery
+      </button>
+      <button
+        className="text-blue-600 hover:text-blue-800"
+        onClick={() => navigate('/account')}
+      >
+        Account Settings
+      </button>
+    </nav>
+  );
+};
+
+export default BottomNav;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/ImageDisplay.tsx ===
+// src/components/ImageDisplay.tsx
+
+import React from 'react';
+
+interface ImageDisplayProps {
+  imageUrl: string;
+}
+
+const ImageDisplay: React.FC<ImageDisplayProps> = ({ imageUrl }) => {
+  return (
+    <div className="w-full mt-6">
+      <img src={imageUrl} alt="Generated" className="w-full rounded-lg" />
+    </div>
+  );
+};
+
+export default ImageDisplay;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/ImageModal.tsx ===
+// src/components/ImageModal.tsx
+
+import React from 'react';
+
+interface Image {
+  _id: string;
+  imageUrl: string;
+  filename: string;
+  bodyPrompt: string;
+  facePrompt: string;
+  resolution: string;
+  timestamp: string;
+}
+
+interface ImageModalProps {
+  image: Image;
+  onClose: () => void;
+  onDownload: (image: Image) => void;
+  onDelete: (imageId: string) => void;
+  onFullView: (image: Image) => void;
+}
+
+const ImageModal: React.FC<ImageModalProps> = ({ image, onClose, onDownload, onDelete, onFullView }) => {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg overflow-hidden w-11/12 max-w-4xl transform transition-transform duration-300 scale-100 hover:scale-105"
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
+      >
+        {/* Close Button */}
+        <div className="flex justify-end p-2">
+          <button
+            onClick={onClose}
+            className="text-gray-700 hover:text-gray-900 text-xl font-bold"
+            aria-label="Close"
+          >
+            ✖
+          </button>
+        </div>
+
+        {/* Image and Details */}
+        <div className="flex flex-col md:flex-row">
+          {/* Image Section */}
+          <div className="md:w-1/2 flex justify-center items-center p-4">
+            <img
+              src={image.imageUrl}
+              alt={image.filename}
+              className="w-full h-auto object-contain rounded-lg"
+            />
+          </div>
+
+          {/* Details Section */}
+          <div className="md:w-1/2 p-4 text-gray-800">
+            <h3 id="modal-title" className="text-2xl font-semibold mb-2">{image.filename}</h3>
+            <p className="mb-1">
+              <span className="font-semibold">Timestamp:</span>{' '}
+              {new Date(image.timestamp).toLocaleString()}
+            </p>
+            <p className="mb-1">
+              <span className="font-semibold">Body Prompt:</span> {image.bodyPrompt}
+            </p>
+            <p className="mb-4">
+              <span className="font-semibold">Face Prompt:</span> {image.facePrompt}
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-4">
+              <button
+                onClick={() => onDownload(image)}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-200"
+              >
+                Download
+              </button>
+              <button
+                onClick={() => {
+                  onDelete(image._id);
+                  onClose();
+                }}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => onFullView(image)}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200"
+              >
+                Full View
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ImageModal;
+
+
+=== File: /home/rob/Documents/picante/frontend/src/components/Header.tsx ===
+// src/components/Header.tsx
+
+import React from 'react';
+
+interface HeaderProps {
+  title: string;
+}
+
+const Header: React.FC<HeaderProps> = ({ title }) => {
+  return (
+    <header className="fixed top-0 left-0 w-full h-16 bg-red-600 text-white flex items-center justify-center z-50">
+      <h1 className="text-3xl font-bold">{title}</h1>
+    </header>
+  );
+};
+
+export default Header;
+
+
