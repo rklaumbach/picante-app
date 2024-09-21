@@ -1,95 +1,3 @@
-=== File: /home/rob/Documents/picante/gpt_dump.py ===
-import os
-from pathlib import Path
-
-def dump_directory_contents(root_dir, output_file, exclude_dirs=None, exclude_files=None, exclude_names=None, verbose=False):
-    if exclude_dirs is None:
-        exclude_dirs = []
-    if exclude_files is None:
-        exclude_files = []
-    if exclude_names is None:
-        exclude_names = []
-
-    root_path = Path(root_dir).resolve()
-
-    # Normalize exclusion paths
-    exclude_paths = [ (root_path / Path(d)).resolve() for d in exclude_dirs ]
-    exclude_file_paths = [ (root_path / Path(f)).resolve() for f in exclude_files ]
-
-    with open(output_file, 'w', encoding='utf-8') as out:
-        for dirpath, dirnames, filenames in os.walk(root_path, topdown=True, followlinks=False):
-            current_path = Path(dirpath).resolve()
-
-            # Exclude directories by absolute path
-            dirs_to_remove = []
-            for dirname in dirnames:
-                dir_full_path = (current_path / dirname).resolve()
-                # Exclude based on absolute path
-                if dir_full_path in exclude_paths:
-                    dirs_to_remove.append(dirname)
-                    if verbose:
-                        print(f'Excluding directory by path: {dir_full_path}')
-                # Exclude based on directory name
-                elif dirname in exclude_names:
-                    dirs_to_remove.append(dirname)
-                    if verbose:
-                        print(f'Excluding directory by name: {dir_full_path}')
-
-            # Modify dirnames in-place to exclude specified directories
-            for dirname in dirs_to_remove:
-                dirnames.remove(dirname)
-
-            # Exclude specific files by path or name
-            for filename in filenames:
-                file_full_path = (current_path / filename).resolve()
-                # Exclude based on absolute path
-                if file_full_path in exclude_file_paths:
-                    if verbose:
-                        print(f'Excluding file by path: {file_full_path}')
-                    continue
-                # Exclude based on file name
-                if filename in exclude_names:
-                    if verbose:
-                        print(f'Excluding file by name: {file_full_path}')
-                    continue
-                # Write the file contents
-                out.write(f'=== File: {file_full_path} ===\n')
-                try:
-                    with open(file_full_path, 'r', encoding='utf-8') as f:
-                        contents = f.read()
-                    out.write(contents + '\n\n')
-                except UnicodeDecodeError:
-                    out.write('[Binary or non-text file cannot be displayed]\n\n')
-                except Exception as e:
-                    out.write(f'[Error reading file: {e}]\n\n')
-    print(f'Directory contents have been dumped to "{output_file}"')
-
-if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Recursively dump all files and their contents from a directory, excluding specified directories and files.')
-    parser.add_argument('directory', help='Path to the directory to dump.')
-    parser.add_argument('-o', '--output', default='directory_dump.txt', help='Output file name (default: directory_dump.txt).')
-    parser.add_argument('-e', '--exclude', nargs='*', default=[], help='Directories to exclude from the dump (relative to the root directory). Separate multiple directories with spaces.')
-    parser.add_argument('-f', '--exclude-file', nargs='*', default=[], help='Files to exclude from the dump (relative to the root directory). Separate multiple files with spaces.')
-    parser.add_argument('-n', '--exclude-name', nargs='*', default=[], help='Names of files or directories to exclude, regardless of their location. Separate multiple names with spaces.')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output for debugging.')
-
-    args = parser.parse_args()
-
-    if not Path(args.directory).is_dir():
-        print(f'Error: The directory "{args.directory}" does not exist or is not a directory.')
-    else:
-        dump_directory_contents(
-            root_dir=args.directory,
-            output_file=args.output,
-            exclude_dirs=args.exclude,
-            exclude_files=args.exclude_file,
-            exclude_names=args.exclude_name,
-            verbose=args.verbose
-        )
-
-
 === File: /home/rob/Documents/picante/project.txt ===
 
 
@@ -643,60 +551,62 @@ const GalleryPage: React.FC = () => {
 
   return (
     <>
-      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen pt-20">
-        {/* Header with required 'title' prop */}
-        <Header title="Gallery" />
+      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl min-h-screen pt-20">
+        <div className="app-container flex flex-col items-center w-full">
+          {/* Header */}
+          <Header title="Gallery" />
 
-        {/* Smaller Title Above the Gallery */}
-        <h2 className="text-2xl font-semibold mt-6">Your Images:</h2>
+          {/* Smaller Title Above the Gallery */}
+          <h2 className="text-2xl font-semibold mt-6 text-black">Your Images:</h2>
 
-        {/* Scrollable Image Gallery */}
-        <div className="w-full mt-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {images.map((image) => (
-              <div
-                key={image._id}
-                className="relative group cursor-pointer overflow-hidden"
-                onClick={() => handleImageClick(image)}
-              >
-                <img
-                  src={image.imageUrl}
-                  alt={image.filename}
-                  loading="lazy"
-                  className="w-full h-auto rounded-lg object-cover transform transition-transform duration-200 hover:scale-105"
-                />
-                <button
-                  className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent triggering the image click
-                    handleDeleteClick(image._id);
-                  }}
-                  aria-label="Delete Image"
+          {/* Scrollable Image Gallery */}
+          <div className="w-full mt-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {images.map((image) => (
+                <div
+                  key={image._id}
+                  className="relative group cursor-pointer overflow-hidden"
+                  onClick={() => handleImageClick(image)}
                 >
-                  ✖
-                </button>
-              </div>
-            ))}
+                  <img
+                    src={image.imageUrl}
+                    alt={image.filename}
+                    loading="lazy"
+                    className="w-full h-auto rounded-lg object-cover transform transition-transform duration-200 hover:scale-105"
+                  />
+                  <button
+                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent triggering the image click
+                      handleDeleteClick(image._id);
+                    }}
+                    aria-label="Delete Image"
+                  >
+                    ✖
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Image Overlay Modal */}
-        {selectedImageDetails && (
-          <ImageModal
-            image={selectedImageDetails}
-            onClose={() => setSelectedImageDetails(null)}
-            onDownload={handleDownload}
-            onDelete={handleDeleteClick}
-            onFullView={handleFullView}
+          {/* Image Overlay Modal */}
+          {selectedImageDetails && (
+            <ImageModal
+              image={selectedImageDetails}
+              onClose={() => setSelectedImageDetails(null)}
+              onDownload={handleDownload}
+              onDelete={handleDeleteClick}
+              onFullView={handleFullView}
+            />
+          )}
+
+          {/* Delete Confirmation Dialog */}
+          <DeleteConfirmationDialog
+            isOpen={isDeleteDialogOpen}
+            onClose={() => setIsDeleteDialogOpen(false)}
+            onConfirm={BACKEND_AVAILABLE ? handleConfirmDelete : handleMockDelete}
           />
-        )}
-
-        {/* Delete Confirmation Dialog */}
-        <DeleteConfirmationDialog
-          isOpen={isDeleteDialogOpen}
-          onClose={() => setIsDeleteDialogOpen(false)}
-          onConfirm={BACKEND_AVAILABLE ? handleConfirmDelete : handleMockDelete}
-        />
+        </div>
       </main>
       <BottomNav />
     </>
@@ -707,7 +617,7 @@ export default GalleryPage;
 
 
 === File: /home/rob/Documents/picante/frontend/src/pages/GenerateImagePage.tsx ===
-// src/pages/GenerateImagePage.tsx
+// frontend/src/pages/GenerateImagePage.tsx
 
 import React, { useState } from 'react';
 import Header from '../components/Header';
@@ -766,26 +676,35 @@ const GenerateImagePage: React.FC = () => {
 
   return (
     <>
-      <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen pt-20">
-        <Header title="Generate Image" />
-        <div className="w-full mt-6">
-          <PromptInput
-            label="Body Prompt"
-            value={bodyPrompt}
-            onChange={setBodyPrompt}
+      <main className="flex flex-col items-center px-4 pb-16 mx-auto w-full max-w-7xl min-h-screen pt-20">
+        <div className="app-container flex flex-col items-center w-full">
+          {/* Header */}
+          <Header title="Generate Image" />
+
+          {/* Prompt Inputs */}
+          <div className="w-full mt-6">
+            <PromptInput
+              label="Body Prompt"
+              value={bodyPrompt}
+              onChange={setBodyPrompt}
+            />
+            <PromptInput
+              label="Face Prompt"
+              value={facePrompt}
+              onChange={setFacePrompt}
+            />
+          </div>
+
+          {/* Generate Button */}
+          <Button
+            text="Generate"
+            className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-200"
+            onClick={handleGenerateImage}
           />
-          <PromptInput
-            label="Face Prompt"
-            value={facePrompt}
-            onChange={setFacePrompt}
-          />
+
+          {/* Display Generated Image */}
+          {generatedImage && <ImageDisplay imageUrl={generatedImage} />}
         </div>
-        <Button
-          text="Generate"
-          className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-200"
-          onClick={handleGenerateImage}
-        />
-        {generatedImage && <ImageDisplay imageUrl={generatedImage} />}
       </main>
       <OutOfCreditsDialog
         isOpen={isOutOfCreditsDialogOpen}
@@ -804,7 +723,7 @@ export default GenerateImagePage;
 
 
 === File: /home/rob/Documents/picante/frontend/src/pages/FullViewPage.tsx ===
-// src/pages/FullViewPage.tsx
+// frontend/src/pages/FullViewPage.tsx
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -837,43 +756,46 @@ const FullViewPage: React.FC = () => {
 
   if (!image) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
-        <p className="text-lg">Loading...</p>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <p className="text-lg text-gray-800">Loading...</p>
       </div>
     ); // Or a loading spinner
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white relative">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 relative">
       {/* Close Button */}
       <button
         onClick={() => navigate(-1)}
-        className="absolute top-4 right-4 bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200"
+        className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200"
         aria-label="Close Full View"
       >
         Close
       </button>
 
-      {/* Full Resolution Image */}
-      <img
-        src={image.imageUrl}
-        alt={image.filename}
-        className="max-w-full max-h-full rounded-lg"
-      />
+      {/* Image and Details Container */}
+      <div className="app-container flex flex-col items-center w-full max-w-4xl">
+        {/* Full Resolution Image */}
+        <img
+          src={image.imageUrl}
+          alt={image.filename}
+          className="w-full h-auto object-contain rounded-lg"
+        />
 
-      {/* Image Details */}
-      <div className="mt-4 text-center">
-        <h2 className="text-3xl font-bold">{image.filename}</h2>
-        <p className="mt-2">
-          <span className="font-semibold">Timestamp:</span>{' '}
-          {new Date(image.timestamp).toLocaleString()}
-        </p>
-        <p className="mt-1">
-          <span className="font-semibold">Body Prompt:</span> {image.bodyPrompt}
-        </p>
-        <p className="mt-1">
-          <span className="font-semibold">Face Prompt:</span> {image.facePrompt}
-        </p>
+        {/* Image Details */}
+        <div className="mt-4 text-center text-gray-800">
+          <h2 className="text-3xl font-bold">{image.filename}</h2>
+          <p className="mt-2">
+            <span className="font-semibold">Timestamp:</span>{' '}
+            {new Date(image.timestamp).toLocaleString()}
+          </p>
+          <p className="mt-1">
+            <span className="font-semibold">Body Prompt:</span> {image.bodyPrompt}
+          </p>
+          <p className="mt-1">
+            <span className="font-semibold">Face Prompt:</span> {image.facePrompt}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -883,7 +805,7 @@ export default FullViewPage;
 
 
 === File: /home/rob/Documents/picante/frontend/src/pages/LandingPage.tsx ===
-// src/pages/LandingPage.tsx
+// frontend/src/pages/LandingPage.tsx
 
 import React, { useState } from 'react';
 import Header from '../components/Header';
@@ -899,36 +821,45 @@ const LandingPage: React.FC = () => {
   return (
     <>
       <Header title="Welcome to Picante" />
-      <main className="pt-20 flex flex-col items-center px-4 pb-10 mx-auto w-full max-w-7xl text-white bg-red-500 min-h-screen">
-        <div className="flex flex-col items-center text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mt-4">
-            Generate stunning images with AI.
-          </h2>
-          <p className="mt-2 text-base sm:text-lg md:text-xl max-w-4xl">
-            Subscribe to get unlimited access and exclusive features.
-          </p>
-        </div>
-        <div className="mt-6 w-full max-w-md sm:max-w-lg flex flex-col space-y-4">
-          <Button
-            text="Get Started"
-            className="bg-blue-500 text-white w-full py-3 rounded-lg hover:bg-blue-600 transition duration-200"
-            onClick={() => setIsSignUpOpen(true)} // Open Sign Up dialog
+      <main className="flex flex-col items-center px-4 pb-10 mx-auto w-full max-w-7xl min-h-screen pt-20">
+        <div className="app-container flex flex-col items-center w-full">
+          {/* Welcome Message */}
+          <div className="flex flex-col items-center text-center">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mt-4 text-white">
+              Generate stunning images with AI.
+            </h2>
+            <p className="mt-2 text-base sm:text-lg md:text-xl max-w-4xl text-white">
+              Subscribe to get unlimited access and exclusive features.
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-6 w-full max-w-md sm:max-w-lg flex flex-col space-y-4">
+            <Button
+              text="Get Started"
+              className="bg-blue-500 text-white w-full py-3 rounded-lg hover:bg-blue-600 transition duration-200"
+              onClick={() => setIsSignUpOpen(true)} // Open Sign Up dialog
+            />
+            <Button
+              text="Log In"
+              className="bg-neutral-200 text-black w-full py-3 rounded-lg hover:bg-neutral-300 transition duration-200"
+              onClick={() => setIsLoginOpen(true)}
+            />
+          </div>
+
+          {/* Feature List */}
+          <FeatureList
+            features={[
+              'Unlimited Images',
+              'Priority Processing',
+              'AI Upscaling',
+              'Access to Animation Features',
+            ]}
           />
-          <Button
-            text="Log In"
-            className="bg-neutral-200 text-black w-full py-3 rounded-lg hover:bg-neutral-300 transition duration-200"
-            onClick={() => setIsLoginOpen(true)}
-          />
         </div>
-        <FeatureList
-          features={[
-            'Unlimited Images',
-            'Priority Processing',
-            'AI Upscaling',
-            'Access to Animation Features',
-          ]}
-        />
       </main>
+
+      {/* Dialogs */}
       <LoginDialog
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
@@ -945,7 +876,7 @@ export default LandingPage;
 
 
 === File: /home/rob/Documents/picante/frontend/src/pages/AccountSettingsPage.tsx ===
-// src/pages/AccountSettingsPage.tsx
+// frontend/src/pages/AccountSettingsPage.tsx
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
@@ -999,7 +930,7 @@ const AccountSettingsPage: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    navigate('/login');
+    navigate('/'); // Redirect to Landing Page
   };
 
   const handleUnsubscribeClick = () => {
@@ -1019,72 +950,79 @@ const AccountSettingsPage: React.FC = () => {
 
   return (
     <>
-      <main className="flex flex-col items-center px-7 pb-10 mx-auto w-full max-w-7xl bg-red-500 text-white min-h-screen">
-        <Header title="Account Settings" />
+      <main className="flex flex-col items-center px-4 pb-10 mx-auto w-full max-w-7xl min-h-screen pt-20">
+        <div className="app-container flex flex-col items-center w-full">
+          {/* Header */}
+          <Header title="Account Settings" />
 
-        <section className="mt-6 w-full">
-          <h2 className="text-2xl">Subscription Status:</h2>
-          <p className="mt-2 text-xl">{user.subscriptionStatus}</p>
-        </section>
+          {/* Subscription Status */}
+          <section className="mt-6 w-full">
+            <h2 className="text-2xl text-white">Subscription Status:</h2>
+            <p className="mt-2 text-xl text-white">{user.subscriptionStatus}</p>
+          </section>
 
-        <form className="w-full mt-8" onSubmit={(e) => e.preventDefault()}>
-          <div className="mt-4">
-            <label className="text-white">Email:</label>
-            <input
-              type="email"
-              className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+          {/* Account Update Form */}
+          <form className="w-full mt-8" onSubmit={(e) => e.preventDefault()}>
+            <div className="mt-4">
+              <label className="text-white">Email:</label>
+              <input
+                type="email"
+                className="w-full mt-2 px-4 py-2 bg-gray-200 rounded-lg text-black"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="text-white">Current Password:</label>
+              <input
+                type="password"
+                className="w-full mt-2 px-4 py-2 bg-gray-200 rounded-lg text-black"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="text-white">New Password:</label>
+              <input
+                type="password"
+                className="w-full mt-2 px-4 py-2 bg-gray-200 rounded-lg text-black"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+
+            <Button
+              text="Update Account"
+              className="mt-6 bg-zinc-800 text-white"
+              onClick={handleUpdateAccount}
             />
-          </div>
+          </form>
 
-          <div className="mt-4">
-            <label className="text-white">Current Password:</label>
-            <input
-              type="password"
-              className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-          </div>
-
-          <div className="mt-4">
-            <label className="text-white">New Password:</label>
-            <input
-              type="password"
-              className="w-full mt-2 px-4 py-2 bg-white rounded-lg text-black"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-          </div>
+          {/* Unsubscribe and Logout Buttons */}
+          <Button
+            text="Unsubscribe"
+            className="mt-4 bg-red-600 text-white"
+            onClick={handleUnsubscribeClick}
+          />
 
           <Button
-            text="Update Account"
-            className="mt-6 bg-zinc-800 text-white"
-            onClick={handleUpdateAccount}
+            text="Log Out"
+            className="mt-4 bg-neutral-200 text-black"
+            onClick={handleLogout}
           />
-        </form>
 
-        <Button
-          text="Unsubscribe"
-          className="mt-4 bg-red-600 text-white"
-          onClick={handleUnsubscribeClick}
-        />
-
-        <Button
-          text="Log Out"
-          className="mt-4 bg-neutral-200 text-black"
-          onClick={handleLogout}
-        />
-
-        {showUnsubscribeModal && (
-          <UnsubscribeModal
-            isOpen={showUnsubscribeModal}
-            onClose={handleCloseModal}
-            userEmail={user.email}
-            onUnsubscribeSuccess={handleUnsubscribeSuccess}
-          />
-        )}
+          {/* Unsubscribe Modal */}
+          {showUnsubscribeModal && (
+            <UnsubscribeModal
+              isOpen={showUnsubscribeModal}
+              onClose={handleCloseModal}
+              userEmail={user.email}
+              onUnsubscribeSuccess={handleUnsubscribeSuccess}
+            />
+          )}
+        </div>
       </main>
       <BottomNav />
     </>
@@ -1214,12 +1152,22 @@ export const useAuth = () => {
 
 
 === File: /home/rob/Documents/picante/frontend/src/styles/index.css ===
-/* src/styles/index.css */
+/* frontend/src/styles/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Custom styles (if any) */
+/* Custom styles */
+
+/* Set the entire page background to light grey */
+body {
+  @apply bg-gray-300;
+}
+
+/* Define a reusable container class for main content */
+.app-container {
+  @apply bg-red-500 border-2 border-red-800 shadow-lg rounded-lg p-6;
+}
 
 
 === File: /home/rob/Documents/picante/frontend/src/components/Dialog.tsx ===
