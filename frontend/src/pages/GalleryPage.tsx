@@ -110,7 +110,9 @@ const GalleryPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Define the BACKEND_AVAILABLE flag
-  const BACKEND_AVAILABLE = false; // Set to true when backend is ready
+  const BACKEND_AVAILABLE = true; // Set to false to use mock data
+
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 
   useEffect(() => {
     // Function to fetch images from the backend
@@ -123,7 +125,7 @@ const GalleryPage: React.FC = () => {
           return;
         }
 
-        const response = await fetch('/api/images/user', {
+        const response = await fetch(`${API_BASE_URL}/api/images/user`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -158,7 +160,7 @@ const GalleryPage: React.FC = () => {
       // Use mock data when backend is not available
       setImages(mockImages);
     }
-  }, [navigate, BACKEND_AVAILABLE]);
+  }, [navigate, BACKEND_AVAILABLE, API_BASE_URL]);
 
   const handleImageClick = (image: Image) => {
     setSelectedImageDetails(image);
@@ -180,7 +182,7 @@ const GalleryPage: React.FC = () => {
         return;
       }
 
-      const response = await fetch(`/api/images/${imageToDelete}`, {
+      const response = await fetch(`${API_BASE_URL}/api/images/${imageToDelete}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -200,7 +202,7 @@ const GalleryPage: React.FC = () => {
       console.error('Error deleting image:', error);
       alert('An error occurred while deleting the image.');
     }
-  }, [imageToDelete, images, navigate]);
+  }, [imageToDelete, images, navigate, API_BASE_URL]);
 
   const handleMockDelete = useCallback(() => {
     if (!imageToDelete) return;

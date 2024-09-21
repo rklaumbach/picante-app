@@ -4,9 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unsubscribe = exports.getUserProfile = void 0;
+exports.updatePassword = exports.unsubscribe = exports.getUserProfile = void 0;
 const User_1 = __importDefault(require("../models/User"));
 const stripe_1 = __importDefault(require("stripe"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
 const getUserProfile = async (req, res) => {
     const userId = req.user.userId;
@@ -56,4 +57,30 @@ const unsubscribe = async (req, res) => {
     }
 };
 exports.unsubscribe = unsubscribe;
+const updatePassword = async (req, res) => {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+    try {
+        const user = await User_1.default.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        // Verify current password
+        const isMatch = await bcryptjs_1.default.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Current password is incorrect' });
+        }
+        // Hash new password
+        const hashedPassword = await bcryptjs_1.default.hash(newPassword, 10);
+        // Update user's password
+        user.password = hashedPassword;
+        await user.save();
+        res.json({ message: 'Password updated successfully' });
+    }
+    catch (error) {
+        console.error('Error updating password:', error);
+        res.status(500).json({ error: 'Failed to update password' });
+    }
+};
+exports.updatePassword = updatePassword;
 //# sourceMappingURL=userController.js.map

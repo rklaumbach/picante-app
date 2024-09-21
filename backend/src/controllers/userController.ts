@@ -3,6 +3,7 @@
 import { Response } from 'express';
 import User from '../models/User';
 import Stripe from 'stripe';
+import bcrypt from 'bcryptjs';
 import { AuthenticatedRequest } from '../middleware/auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2020-08-27' });
@@ -59,5 +60,36 @@ export const unsubscribe = async (req: AuthenticatedRequest, res: Response) => {
   } catch (error) {
     console.error('Error cancelling subscription:', error);
     res.status(500).json({ error: 'Failed to cancel subscription' });
+  }
+};
+
+export const updatePassword = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user.userId;
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user's password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Error updating password:', error);
+    res.status(500).json({ error: 'Failed to update password' });
   }
 };

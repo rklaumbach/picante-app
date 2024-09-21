@@ -15,8 +15,19 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-// Middleware
-app.use(cors());
+// Define allowed origins
+const allowedOrigins = ['http://localhost:3000']; // Replace with your frontend URL
+
+// Configure CORS middleware
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true, // Allow cookies and auth headers
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

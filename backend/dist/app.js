@@ -16,8 +16,15 @@ const webhookRoutes_1 = __importDefault(require("./routes/webhookRoutes"));
 const app = (0, express_1.default)();
 // Connect to MongoDB
 (0, connection_1.default)();
-// Middleware
-app.use((0, cors_1.default)());
+// Define allowed origins
+const allowedOrigins = ['http://localhost:3000']; // Replace with your frontend URL
+// Configure CORS middleware
+app.use((0, cors_1.default)({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 // Routes

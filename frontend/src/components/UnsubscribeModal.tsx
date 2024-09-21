@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Dialog from './Dialog';
 import Button from './Button';
+import { useNavigate } from 'react-router-dom';
 
 interface UnsubscribeModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const UnsubscribeModal: React.FC<UnsubscribeModalProps> = ({
 }) => {
   const [reasons, setReasons] = useState<string[]>([]);
   const [additionalFeedback, setAdditionalFeedback] = useState('');
+  const navigate = useNavigate();
 
   const unsubscribeReasons = [
     'Too expensive',
@@ -27,6 +29,8 @@ const UnsubscribeModal: React.FC<UnsubscribeModalProps> = ({
     'Privacy concerns',
     'Other',
   ];
+
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 
   const handleReasonChange = (reason: string) => {
     setReasons((prevReasons) =>
@@ -40,11 +44,18 @@ const UnsubscribeModal: React.FC<UnsubscribeModalProps> = ({
     e.preventDefault();
 
     try {
-      const response = await fetch('/api/unsubscribe', {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        onClose();
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/user/unsubscribe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           reasons,

@@ -1,4 +1,4 @@
-// frontend/src/pages/AccountSettingsPage.tsx
+// src/pages/AccountSettingsPage.tsx
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
@@ -18,15 +18,25 @@ const AccountSettingsPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showUnsubscribeModal, setShowUnsubscribeModal] = useState(false);
+
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 
   useEffect(() => {
     // Fetch user data
     const fetchUserData = async () => {
       try {
-        const response = await fetch('/api/user/profile', {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.warn('No token found, redirecting to login.');
+          navigate('/login');
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${token}`,
           },
         });
 
@@ -43,11 +53,79 @@ const AccountSettingsPage: React.FC = () => {
     };
 
     fetchUserData();
-  }, [navigate]);
+  }, [navigate, API_BASE_URL]);
 
-  const handleUpdateAccount = async () => {
-    // Implement account update logic
-    alert('Account information updated successfully!');
+  // Function to update user profile (email)
+  const handleUpdateProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found, redirecting to login.');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert('Email updated successfully!');
+        setUser((prevUser) => ({ ...prevUser, email: data.email }));
+      } else {
+        const data = await response.json();
+        alert(`Failed to update email: ${data.error || response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error updating email:', error);
+      alert('An error occurred while updating the email.');
+    }
+  };
+
+  // Function to update password
+  const handleUpdatePassword = async () => {
+    // Client-side validation
+    if (newPassword !== confirmNewPassword) {
+      alert('New passwords do not match.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found, redirecting to login.');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/user/update-password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      if (response.ok) {
+        alert('Password updated successfully!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmNewPassword('');
+      } else {
+        const data = await response.json();
+        alert(`Failed to update password: ${data.error || response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error updating password:', error);
+      alert('An error occurred while updating the password.');
+    }
   };
 
   const handleLogout = () => {
@@ -83,8 +161,9 @@ const AccountSettingsPage: React.FC = () => {
             <p className="mt-2 text-xl text-white">{user.subscriptionStatus}</p>
           </section>
 
-          {/* Account Update Form */}
+          {/* Profile Update Form */}
           <form className="w-full mt-8" onSubmit={(e) => e.preventDefault()}>
+            <h2 className="text-xl text-white mb-4">Update Email</h2>
             <div className="mt-4">
               <label className="text-white">Email:</label>
               <input
@@ -95,6 +174,16 @@ const AccountSettingsPage: React.FC = () => {
               />
             </div>
 
+            <Button
+              text="Update Email"
+              className="mt-6 bg-zinc-800 text-white"
+              onClick={handleUpdateProfile}
+            />
+          </form>
+
+          {/* Password Update Form */}
+          <form className="w-full mt-8" onSubmit={(e) => e.preventDefault()}>
+            <h2 className="text-xl text-white mb-4">Change Password</h2>
             <div className="mt-4">
               <label className="text-white">Current Password:</label>
               <input
@@ -115,10 +204,20 @@ const AccountSettingsPage: React.FC = () => {
               />
             </div>
 
+            <div className="mt-4">
+              <label className="text-white">Confirm New Password:</label>
+              <input
+                type="password"
+                className="w-full mt-2 px-4 py-2 bg-gray-200 rounded-lg text-black"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+              />
+            </div>
+
             <Button
-              text="Update Account"
+              text="Update Password"
               className="mt-6 bg-zinc-800 text-white"
-              onClick={handleUpdateAccount}
+              onClick={handleUpdatePassword}
             />
           </form>
 

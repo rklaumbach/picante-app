@@ -1,4 +1,4 @@
-// frontend/src/pages/GenerateImagePage.tsx
+// src/pages/GenerateImagePage.tsx
 
 import React, { useState } from 'react';
 import Header from '../components/Header';
@@ -18,6 +18,8 @@ const GenerateImagePage: React.FC = () => {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
   const { isAuthenticated } = useAuth();
 
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+
   const handleGenerateImage = async () => {
     if (!isAuthenticated) {
       setIsLoginDialogOpen(true);
@@ -31,7 +33,7 @@ const GenerateImagePage: React.FC = () => {
         return;
       }
 
-      const response = await fetch('/api/images/generate', {
+      const response = await fetch(`${API_BASE_URL}/api/images/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

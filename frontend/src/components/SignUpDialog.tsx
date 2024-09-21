@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Dialog from './Dialog';
 import Button from './Button';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SignUpDialogProps {
   isOpen: boolean;
@@ -10,14 +11,32 @@ interface SignUpDialogProps {
 }
 
 const SignUpDialog: React.FC<SignUpDialogProps> = ({ isOpen, onClose }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [accountCreated, setAccountCreated] = useState(false);
+  const { login } = useAuth();
 
-  const handleSignUp = () => {
-    // Placeholder for sign-up logic
-    // For now, simulate account creation
-    setAccountCreated(true);
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+
+  const handleSignUp = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        login(data.token);
+        setAccountCreated(true);
+      } else {
+        alert(data.error || 'Sign up failed.');
+      }
+    } catch (error) {
+      console.error('Sign up error:', error);
+      alert('An error occurred during sign up.');
+    }
   };
 
   const handleClose = () => {
@@ -32,14 +51,14 @@ const SignUpDialog: React.FC<SignUpDialogProps> = ({ isOpen, onClose }) => {
           <h2 className="text-2xl mb-4">Sign Up</h2>
           <form onSubmit={(e) => e.preventDefault()}>
             <div className="mb-4">
-              <label className="block text-left">Username:</label>
+              <label className="block text-left">Email:</label>
               <input
-                type="text"
+                type="email"
                 className="w-full mt-2 px-4 py-2 bg-gray-100 rounded-lg"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="Choose a username"
+                placeholder="Enter your email"
               />
             </div>
             <div className="mb-4">
