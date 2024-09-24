@@ -1,0 +1,73 @@
+{
+    "models": {
+      "base_model_path": "./models/sdxxxl_v30",
+      "controlnet_model_paths": [
+        "./models/controlnet_1",
+        "./models/controlnet_2",
+        "./models/controlnet_3"
+      ],
+      "realesrgan_model_path": "./models/RealESRGAN_x2.pth"
+    },
+    "stages": {
+      "txt2img": {
+        "prompt": "A bright lights, beautiful blue eyes, wide-angle lens, cinematic lighting, back-lit, key light, wet hair, symmetrical, high detailed reflections, intricately detailed, intricate eyes, 8k uhd, 35mm, film lens, skin pores, face in focus, digital art, precise lines, sharp image",
+        "negative_prompt": "3d, cartoon, text, deformed face, extra arms, extra limbs, bad hands, missing fingers, fat fingers, blurry, pixelated, jpeg artifacts",
+        "seed": 826173476497,
+        "steps": 30,
+        "sampler": "dpmpp_2s_ancestral",
+        "scheduler": "karras",
+        "width": 864,
+        "height": 1536,
+        "cfg_scale": 7.0
+      },
+      "upscale": {
+        "prompt": "A bright lights, beautiful blue eyes, wide-angle lens, cinematic lighting, back-lit, key light, wet hair, symmetrical, high detailed reflections, intricately detailed, intricate eyes, 8k uhd, 35mm, film lens, skin pores, face in focus, digital art, precise lines, sharp image",
+        "negative_prompt": "3d, cartoon, text, deformed face, extra arms, extra limbs, bad hands, missing fingers, fat fingers, blurry, pixelated, jpeg artifacts",
+        "seed": 8674037698470,
+        "steps": 30,
+        "sampler": "dpmpp_2s_ancestral",
+        "scheduler": "karras",
+        "width": 2048,
+        "height": 2048,
+        "cfg_scale": 6.0,
+        "scale": 2.0,
+        "denoise": 0.4,
+        "tiles": 2
+      },
+      "after_detailer": {
+        "prompt": "A beautiful girl, textured skin, detailed hair, clear eyes, smooth skin, clean face, 3D_Mouth, scared, happy, intense, beautiful",
+        "negative_prompt": "",
+        "mask_prompt": "Person",
+        "seed": 819076568544660,
+        "steps": 30,
+        "sampler": "dpmpp_2s_ancestral",
+        "scheduler": "karras",
+        "denoise": 0.4,
+        "mask_detection_area": true
+      }
+    },
+    "controlnet": {
+      "strength": 1.0
+    },
+    "image_savers": {
+      "txt2img": {
+        "path": "TXT2IMG/{date}",
+        "extension": "png",
+        "lossless_webp": true,
+        "denoise": 1.0
+      },
+      "upscale": {
+        "path": "USD/{date}",
+        "extension": "png",
+        "lossless_webp": true,
+        "denoise": 1.0
+      },
+      "after_detailer": {
+        "path": "AD/{date}",
+        "extension": "png",
+        "lossless_webp": true,
+        "denoise": 1.0
+      }
+    }
+  }
+  
