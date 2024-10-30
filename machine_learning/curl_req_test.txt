@@ -1,0 +1,32 @@
+curl -X POST https://rklaumbach--image-processing-app-serve-fastapi.modal.run/generate-txt2img \
+     -H "Content-Type: application/json" \
+     -d '{
+           "steps": "all",
+           "upscale": true,
+           "image_prompt": "A beautiful sunset over a mountain range.",
+           "negative_prompt": "low quality, blurry",
+           "face_prompt": "highly detailed face, 8k resolution",
+           "face_negative_prompt": "lowres, bad anatomy"
+         }'
+
+curl -X POST https://rklaumbach--image-processing-app-serve-fastapi.modal.run/generate-img2img \
+     -F "steps=all" \
+     -F "upscale=true" \
+     -F "image_prompt=A beautiful sunset over a mountain range." \
+     -F "face_prompt=highly detailed face, 8k resolution" \
+     -F "negative_prompt=low quality, blurry" \
+     -F "face_negative_prompt=lowres, bad anatomy" \
+     -F "res=1024x1024" \
+     -F "strength=0.7" \
+     -F "file=@/path/to/your/input_image.png"
+
+curl -X POST https://rklaumbach--image-processing-app-serve-fastapi-dev.modal.run/generate-txt2img \
+     -H "Content-Type: application/json" \
+     -d '{
+           "steps": "all",
+           "upscale": true,
+           "image_prompt": "A beautiful sunset over a mountain range.",
+           "negative_prompt": "low quality, blurry",
+           "face_prompt": "highly detailed face, 8k resolution",
+           "face_negative_prompt": "lowres, bad anatomy"
+         }'
