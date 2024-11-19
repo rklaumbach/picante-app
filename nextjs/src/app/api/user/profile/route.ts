@@ -25,11 +25,11 @@ export async function GET(req: NextRequest) {
     const userId = token.sub as string;
 
     // Use Admin API to get user details
-    const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
 
-    console.log(user);
+    console.log(userData);
 
-    if (userError || !user) {
+    if (userError || !userData) {
       console.error('Error fetching user from auth API:', userError);
       return NextResponse.json({ error: 'Failed to retrieve user email.' }, { status: 500 });
     }
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     const userProfile: UserProfile = {
       id: profileData.id,
-      email: user.email || '', // Ensure email is always a string
+      email: userData.user.email || '', // Ensure email is always a string
       credits: profileData.credits,
       subscriptionStatus: profileData.subscription_status, // Align with client-side interface
       // Map other fields as necessary
