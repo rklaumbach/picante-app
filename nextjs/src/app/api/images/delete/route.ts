@@ -61,7 +61,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
     // Delete the image from Supabase storage
     const { error: deleteError } = await supabase
       .storage
-      .from('user_images')
+      .from('user-images')
       .remove([imageData.image_path]);
 
     if (deleteError) {
