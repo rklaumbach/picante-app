@@ -53,7 +53,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Log all incoming cookies for debugging
-  console.log("Middleware: Incoming Cookies:", JSON.stringify(req.cookies));
+  console.log("Middleware: Incoming Cookies:", JSON.stringify(req.cookies.getAll()));
 
   // Apply rate limiting based on the route
   try {
