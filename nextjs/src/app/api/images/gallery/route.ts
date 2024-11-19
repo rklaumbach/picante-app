@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       data.map(async (img: any) => {
         const { data: signedData, error: signedError } = await supabase
           .storage
-          .from('user_images')
+          .from('user-images')
           .createSignedUrl(img.image_path, 60 * 60); // URL valid for 1 hour
 
         if (signedError) {
