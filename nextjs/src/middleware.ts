@@ -72,8 +72,7 @@ export async function middleware(req: NextRequest) {
   // Check if the requested route is protected
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     // Retrieve token using NextAuth.js's getToken
-    const token = await getToken({ req, secret: JWT_SECRET ,
-      cookieName: "__Secure-next-auth.session-token"
+    const token = await getToken({ req, secret: JWT_SECRET , secureCookie : true
     });
 
     // Log the retrieved token
@@ -92,8 +91,7 @@ export async function middleware(req: NextRequest) {
 
   // Handle redirecting authenticated users away from the landing page
   if (pathname === "/") {
-    const token = await getToken({ req, secret: JWT_SECRET ,
-      cookieName: "__Secure-next-auth.session-token"
+    const token = await getToken({ req, secret: JWT_SECRET , secureCookie : true
     });
 
     // Log the retrieved token for the landing page
