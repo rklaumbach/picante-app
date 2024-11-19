@@ -52,6 +52,9 @@ export async function middleware(req: NextRequest) {
   const ip = getClientIp(req);
   const { pathname } = req.nextUrl;
 
+  // Log all incoming cookies for debugging
+  console.log("Middleware: Incoming Cookies:", JSON.stringify(req.cookies));
+
   // Apply rate limiting based on the route
   try {
     if (pathname.startsWith("/api/images")) {
@@ -71,7 +74,8 @@ export async function middleware(req: NextRequest) {
     // Retrieve token using NextAuth.js's getToken
     const token = await getToken({ req, secret: JWT_SECRET });
 
-    console.log(`Middleware: Checking authentication for path ${pathname}`);
+    // Log the retrieved token
+    console.log("Middleware: Retrieved Token:", JSON.stringify(token));
 
     if (!token) {
       console.log("Middleware: No token found, redirecting to /");
@@ -87,6 +91,9 @@ export async function middleware(req: NextRequest) {
   // Handle redirecting authenticated users away from the landing page
   if (pathname === "/") {
     const token = await getToken({ req, secret: JWT_SECRET });
+
+    // Log the retrieved token for the landing page
+    console.log("Middleware: Retrieved Token for '/' route:", JSON.stringify(token));
 
     if (token) {
       console.log(
