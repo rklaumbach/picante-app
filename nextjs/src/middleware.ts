@@ -53,7 +53,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Log all incoming cookies for debugging
-  console.log("Middleware: Incoming Cookies:", JSON.stringify(req.cookies.getAll()));
+  // console.log("Middleware: Incoming Cookies:", JSON.stringify(req.cookies.getAll()));
 
   // Apply rate limiting based on the route
   try {
@@ -72,7 +72,9 @@ export async function middleware(req: NextRequest) {
   // Check if the requested route is protected
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     // Retrieve token using NextAuth.js's getToken
-    const token = await getToken({ req, secret: JWT_SECRET });
+    const token = await getToken({ req, secret: JWT_SECRET ,
+      cookieName: "__Secure-next-auth.session-token"
+    });
 
     // Log the retrieved token
     console.log("Middleware: Retrieved Token:", JSON.stringify(token));
@@ -90,7 +92,9 @@ export async function middleware(req: NextRequest) {
 
   // Handle redirecting authenticated users away from the landing page
   if (pathname === "/") {
-    const token = await getToken({ req, secret: JWT_SECRET });
+    const token = await getToken({ req, secret: JWT_SECRET ,
+      cookieName: "__Secure-next-auth.session-token"
+    });
 
     // Log the retrieved token for the landing page
     console.log("Middleware: Retrieved Token for '/' route:", JSON.stringify(token));
