@@ -101,8 +101,7 @@ const GalleryPage: React.FC = () => {
   // Function to handle full view
   const handleFullView = useCallback((image: Image) => {
     // Open the full view in a new tab and pass the image data via sessionStorage
-    sessionStorage.setItem('fullViewImage', JSON.stringify(image));
-    window.open('/fullview', '_blank');
+    window.open(image.image_url, '_blank');
   }, []);
 
   if (loading) {
