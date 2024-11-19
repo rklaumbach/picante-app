@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     // **Important Correction: Extract userId correctly**
     // The response from createUser has the user object inside data.user
-    const userId = createData?.id || createData?.user?.id;
+    const userId = createData?.user?.id;
 
     if (!userId) {
       console.error('Failed to retrieve user ID from createUser response:', createData);
