@@ -18,7 +18,7 @@ interface Image {
 
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: { id: string }; searchParams: URLSearchParams }
 ): Promise<NextResponse> {
   const imageId = context.params.id;
 
