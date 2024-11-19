@@ -79,8 +79,8 @@ const UnsubscribeModal: React.FC<UnsubscribeModalProps> = ({
 
   return (
     <Dialog isOpen={isOpen} onClose={onClose}>
-      <h2 className="text-2xl mb-4">We're sorry to see you go!</h2>
-      <p>Please let us know why you're unsubscribing:</p>
+      <h2 className="text-2xl mb-4">We are sorry to see you go!</h2>
+      <p>Please let us know why you are unsubscribing:</p>
       <form onSubmit={handleSubmit}>
         <div className="mt-4">
           {unsubscribeReasons.map((reason, index) => (
