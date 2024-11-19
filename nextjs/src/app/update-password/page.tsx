@@ -35,8 +35,6 @@ const UpdatePasswordPage: React.FC = () => {
     try {
       const { data, error } = await supabaseClient.auth.updateUser({
         password: newPassword,
-      }, {
-        accessToken,
       });
 
       if (error) {
