@@ -58,7 +58,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
           .slice(0, 10)
           .map((tagObj) => tagObj.tag);
 
-// Handle tag selection (selection from Combobox or free solo input)
+  // Handle tag selection (selection from Combobox or free solo input)
   const handleSelection = (tag: string | null) => {
     if (tag) {
       // Prevent duplicate tags
@@ -66,17 +66,20 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
         setSelectedTags([...selectedTags, { tag, weight: 1.0 }]);
       }
       setQuery(''); // Clear the input field
-  
+
+      // Capture the current input element
+      const currentInput = inputRef.current;
+
       // Focus the input field after adding the tag
-      if (inputRef.current) {
+      if (currentInput) {
         setTimeout(() => {
-          inputRef.current.value = ''; // Directly set the input value to empty
-          inputRef.current.focus(); // Refocus the input for the next entry
+          currentInput.value = ''; // Directly set the input value to empty
+          currentInput.focus(); // Refocus the input for the next entry
         }, 0);
       }
     }
   };
-  
+    
 
   // Increase the weight of a selected tag
   const handleIncreaseWeight = (index: number) => {

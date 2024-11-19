@@ -110,7 +110,7 @@ const UnsubscribeModal: React.FC<UnsubscribeModalProps> = ({
 
         <div className="flex justify-end mt-6">
           <Button text="Cancel" className="bg-gray-300 text-black mr-4" onClick={onClose} />
-          <Button text="Submit" className="bg-red-600 text-white" type="submit" />
+          <Button text="Submit" className="bg-red-600 text-white" onClick={onClose}/>
         </div>
       </form>
     </Dialog>
