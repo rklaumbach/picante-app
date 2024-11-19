@@ -91,13 +91,37 @@ const GalleryPage: React.FC = () => {
   }, [imageToDelete, images]);
 
   // Function to handle image download
-  const handleDownload = useCallback((image: Image) => {
-    const link = document.createElement('a');
-    link.href = image.image_url;
-    link.download = image.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = useCallback(async (image: Image) => {
+    try {
+      // Fetch the image as a blob
+      const response = await fetch(image.image_url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary anchor element and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = image.filename; // Ensure filename has the correct extension
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading the image:', error);
+      toast.error('Failed to download the image.');
+    }
   }, []);
 
   // Function to handle full view
