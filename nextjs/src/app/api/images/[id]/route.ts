@@ -4,8 +4,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { createClient } from '@supabase/supabase-js';
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const imageId = params.id;
+// Define the expected structure of your Image object
+interface Image {
+  id: string;
+  image_path: string;
+  filename: string;
+  body_prompt: string;
+  face_prompt: string;
+  resolution: string;
+  user_id: string;
+  created_at: string;
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: { id: string } }
+): Promise<NextResponse> {
+  const imageId = context.params.id;
 
   try {
     // Authenticate the user
