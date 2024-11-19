@@ -1,3 +1,5 @@
+# stages/face_detailer.py
+
 from datetime import datetime
 import mediapipe as mp
 from diffusers import (
@@ -14,11 +16,8 @@ import cv2
 from torch import autocast
 from ultralytics import YOLO
 
-
 def truncate_prompt(prompt, tokenizer, max_length=77):
-    """
-    Truncate the prompt by token count without decoding.
-    """
+    """Truncate the prompt by token count without decoding."""
     try:
         tokens = tokenizer.encode(prompt)
         if len(tokens) > max_length:
@@ -32,7 +31,6 @@ def truncate_prompt(prompt, tokenizer, max_length=77):
         logger.error(f"Error truncating prompt: {e}")
         raise
 
-# Enhanced FaceDetailer Class with ControlNet and Head Pose Estimation
 class FaceDetailer:
     def __init__(
         self,
@@ -52,14 +50,14 @@ class FaceDetailer:
         self.width = width
         self.padding_ratio = padding_ratio
         self.timestamp = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
+        
         # Initialize YOLO with fixed model path
         try:
-            self.yolo = YOLO("/app/models/face_yolov8m.pt")
+            self.yolo = YOLO("/app/models/face_yolov8m.pt").to(self.device)
             logger.info("YOLO model loaded successfully for face detection.")
         except Exception as e:
             logger.error(f"Error loading YOLO model: {e}")
             raise
-
 
         # Initialize MediaPipe Face Mesh
         self.mp_face_mesh = mp.solutions.face_mesh
@@ -75,7 +73,7 @@ class FaceDetailer:
 
     def initialize_pipeline(self):
         """
-        Initialize the inpainting pipeline using ControlNet compatible with SDXL, using a different model for face detailing.
+        Initialize the inpainting pipeline using ControlNet compatible with SDXL.
         """
         try:
             # Load SDXL-compatible ControlNet model
@@ -85,10 +83,10 @@ class FaceDetailer:
                 use_safetensors=False
             ).to(self.device)
 
-            # Load the face detailing model components from "realisticFreedomSFW_ophelia.safetensors"
+            # Load the face detailing model components
             model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
 
-            # Load the model components
+            # Load the pipeline
             pipe = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
                 model_file,
                 controlnet=controlnet,
@@ -113,12 +111,12 @@ class FaceDetailer:
     def match_skin_tones(self, source_image, target_image, mask):
         """
         Adjust the color distribution of the target image's skin region to match that of the source image.
-        
+
         Args:
             source_image (PIL.Image.Image): Original image.
             target_image (PIL.Image.Image): Inpainted image.
             mask (PIL.Image.Image): Mask used for inpainting.
-        
+
         Returns:
             PIL.Image.Image: Color-matched image.
         """
@@ -141,16 +139,8 @@ class FaceDetailer:
                     logger.warning(f"No skin pixels found in channel {channel} for histogram matching.")
                     continue
 
-                # Compute the histogram matching for the current channel
-                # Note: match_histograms expects both input and reference to be images
-                # Therefore, we'll create masked images for each channel
-                source_channel = source_np[:, :, channel].copy()
-                source_channel[~mask_np] = 0  # Mask out non-skin regions
-                target_channel = target_np[:, :, channel].copy()
-                target_channel[~mask_np] = 0  # Mask out non-skin regions
-
                 # Perform histogram matching on the masked regions
-                matched_channel = match_histograms(target_channel, source_channel, channel_axis=None)
+                matched_channel = match_histograms(target_np[:, :, channel], source_np[:, :, channel], channel_axis=None)
 
                 # Replace only the masked regions in the target image
                 matched_target_np[:, :, channel][mask_np] = matched_channel[mask_np]
@@ -165,7 +155,6 @@ class FaceDetailer:
         except Exception as e:
             logger.error(f"Error matching skin tones: {e}")
             raise
-
 
     def enhance_faces(
         self,
@@ -206,7 +195,6 @@ class FaceDetailer:
             detections = self.yolo(img_np)  # YOLOv8 inference
 
             # Filter detections for faces (assuming YOLOv8's 'face' class is known, adjust as necessary)
-            # You might need to adjust the class index based on the YOLO model's classes
             face_class_index = 0  # Replace with the correct class index if different
             face_detections = [det for det in detections[0].boxes if det.cls == face_class_index]
 
@@ -216,12 +204,15 @@ class FaceDetailer:
                 del self.pipe
                 torch.cuda.empty_cache()
                 gc.collect()
-                return image
+                return {'enhanced_face': image, 'debug_images': {}}
 
             logger.info(f"Detected {len(face_detections)} face(s) using YOLO.")
 
             # Create a copy of the original image to paste enhanced faces
             final_image = image.copy()
+
+            # Initialize a dictionary to hold all debug images
+            debug_images = {}
 
             # Process each detected face individually
             for idx, det in enumerate(face_detections, start=1):
@@ -238,22 +229,18 @@ class FaceDetailer:
                 pad_x = int(box_width * self.padding_ratio)
                 pad_y = int(box_height * self.padding_ratio)
 
+                logger.info(f"Face {idx} original bbox: ({x1}, {y1}, {x2}, {y2})")
+                logger.info(f"Face {idx} padded bbox: ({x1 - pad_x}, {y1 - pad_y}, {x2 + pad_x}, {y2 + pad_y})")
+
                 # Apply padding, ensuring coordinates stay within image boundaries
                 x1_padded = max(x1 - pad_x, 0)
                 y1_padded = max(y1 - pad_y, 0)
                 x2_padded = min(x2 + pad_x, image.width)
                 y2_padded = min(y2 + pad_y, image.height)
 
-                logger.info(f"Face {idx} original bbox: ({x1}, {y1}, {x2}, {y2})")
-                logger.info(f"Face {idx} padded bbox: ({x1_padded}, {y1_padded}, {x2_padded}, {y2_padded})")
-
                 # Crop the padded face region from the original image
                 face_region = img_rgb.crop((x1_padded, y1_padded, x2_padded, y2_padded))
-
-                # Save the cropped face before landmarks as a debug image
-                # face_before_landmarks_path = f"debug_images/face_{idx}_before_landmarks_{self.timestamp}.png"
-                # face_region.save(face_before_landmarks_path)
-                # logger.info(f"Cropped face before landmarks saved at {face_before_landmarks_path}")
+                debug_images[f'face_{idx}_before_landmarks'] = face_region
 
                 # Convert cropped face to NumPy array for MediaPipe processing
                 face_np = np.array(face_region)
@@ -275,17 +262,12 @@ class FaceDetailer:
                         x = int(lm.x * face_region.width)
                         y = int(lm.y * face_region.height)
                         draw.ellipse((x - 1, y - 1, x + 1, y + 1), fill=(255, 0, 0))
-
-                # # Save the cropped face after landmarks as a debug image
-                # face_after_landmarks_path = f"debug_images/face_{idx}_after_landmarks_{self.timestamp}.png"
-                # img_with_landmarks.save(face_after_landmarks_path)
-                # logger.info(f"Cropped face after landmarks saved at {face_after_landmarks_path}")
+                debug_images[f'face_{idx}_after_landmarks'] = img_with_landmarks
 
                 # Create a precise mask using the detected facial landmarks
                 face_mask = self.create_precise_mask_with_landmarks(face_region, results.multi_face_landmarks)
-
-                # Ensure the mask is the same size as the cropped face region
                 face_mask = face_mask.resize(face_region.size, resample=Image.NEAREST)
+                debug_images[f'face_{idx}_mask'] = face_mask
 
                 # Create a control image from the facial landmarks for ControlNet
                 control_image = Image.new('RGB', face_region.size, (0, 0, 0))
@@ -296,15 +278,7 @@ class FaceDetailer:
                         landmark_y = int(lm.y * face_region.height)
                         # Draw a single white pixel for each landmark
                         control_image.putpixel((landmark_x, landmark_y), (255, 255, 255))
-
-                # Save the mask and control image for debugging
-                # mask_debug_path = f"debug_images/face_{idx}_mask_{self.timestamp}.png"
-                # face_mask.save(mask_debug_path)
-                # logger.info(f"Face {idx} mask saved at {mask_debug_path}")
-
-                # control_debug_path = f"debug_images/face_{idx}_control_{self.timestamp}.png"
-                # control_image.save(control_debug_path)
-                # logger.info(f"Face {idx} control image saved at {control_debug_path}")
+                debug_images[f'face_{idx}_control'] = control_image
 
                 # Upscale the face region, mask, and control image
                 upscale_factor = 5  # You can adjust this factor as needed
@@ -313,18 +287,9 @@ class FaceDetailer:
                 face_mask_high_res = face_mask.resize(high_res_size, resample=Image.NEAREST)
                 control_image_high_res = control_image.resize(high_res_size, resample=Image.NEAREST)
 
-                # Save high-res images for debugging
-                # face_high_res_path = f"debug_images/face_{idx}_high_res_before_inpaint_{self.timestamp}.png"
-                # face_region_high_res.save(face_high_res_path)
-                # logger.info(f"Face {idx} high-res face saved at {face_high_res_path}")
-
-                # mask_high_res_path = f"debug_images/face_{idx}_high_res_mask_{self.timestamp}.png"
-                # face_mask_high_res.save(mask_high_res_path)
-                # logger.info(f"Face {idx} high-res mask saved at {mask_high_res_path}")
-
-                # control_high_res_path = f"debug_images/face_{idx}_high_res_control_{self.timestamp}.png"
-                # control_image_high_res.save(control_high_res_path)
-                # logger.info(f"Face {idx} high-res control image saved at {control_high_res_path}")
+                debug_images[f'face_{idx}_high_res_before_inpaint'] = face_region_high_res
+                debug_images[f'face_{idx}_high_res_mask'] = face_mask_high_res
+                debug_images[f'face_{idx}_high_res_control'] = control_image_high_res
 
                 # Inpaint the high-resolution face
                 with autocast(self.device):
@@ -336,23 +301,16 @@ class FaceDetailer:
                         control_image=control_image_high_res,
                         num_inference_steps=30,
                         guidance_scale=7.5,
+                        strength=0.5,
                         height=high_res_size[1],
                         width=high_res_size[0]
                     )
                 enhanced_face_high_res = result.images[0]
-
-                # # Save the inpainted high-res face for debugging
-                # inpainted_high_res_path = f"debug_images/face_{idx}_high_res_inpainted_{self.timestamp}.png"
-                # enhanced_face_high_res.save(inpainted_high_res_path)
-                # logger.info(f"Face {idx} high-res inpainted image saved at {inpainted_high_res_path}")
+                debug_images[f'face_{idx}_high_res_inpainted'] = enhanced_face_high_res
 
                 # Downscale the enhanced face back to original face region size
                 enhanced_face = enhanced_face_high_res.resize(face_region.size, resample=Image.LANCZOS)
-
-                # # Save the downscaled enhanced face for debugging
-                # enhanced_face_path = f"debug_images/face_{idx}_enhanced_{self.timestamp}.png"
-                # enhanced_face.save(enhanced_face_path)
-                # logger.info(f"Face {idx} enhanced face saved at {enhanced_face_path}")
+                debug_images[f'face_{idx}_enhanced'] = enhanced_face
 
                 # Paste the enhanced face back into the original image
                 final_image.paste(enhanced_face, (x1_padded, y1_padded), face_mask)
@@ -362,21 +320,21 @@ class FaceDetailer:
             torch.cuda.empty_cache()
             gc.collect()
 
-            return final_image
-
+            return {'enhanced_face': final_image, 'debug_images': debug_images}
         except Exception as e:
             logger.exception("Error enhancing faces:")
-            raise
+        raise
+
 
 
     def create_precise_mask_with_landmarks(self, image, face_landmarks):
         """
         Create a precise binary mask using the convex hull of all facial landmarks.
-        
+
         Args:
             image (PIL.Image.Image): The cropped face image.
             face_landmarks (list): List of detected facial landmarks from MediaPipe.
-        
+
         Returns:
             PIL.Image.Image: Binary mask image.
         """
@@ -384,7 +342,7 @@ class FaceDetailer:
             mask = Image.new('L', image.size, 0)
             draw = ImageDraw.Draw(mask)
 
-            for idx, landmarks in enumerate(face_landmarks, start=1):
+            for landmarks in face_landmarks:
                 # Extract (x, y) coordinates of all landmarks for the current face
                 points = [
                     (lm.x * image.width, lm.y * image.height)
@@ -403,19 +361,11 @@ class FaceDetailer:
                 # Draw the convex hull on the mask
                 draw.polygon(hull_points, fill=255)
 
-                # Optional: Draw the hull on the image for debugging
-                img_with_hull = image.copy()
-                draw_img = ImageDraw.Draw(img_with_hull)
-                draw_img.line(hull_points + [hull_points[0]], fill=(255, 0, 0), width=2)
-                # hull_debug_path = f"debug_images/hull_debug_face{idx}_{self.timestamp}.png"
-                # img_with_hull.save(hull_debug_path)
-                # logger.info(f"Convex hull visualization for face {idx} saved at {hull_debug_path}")
-
             # Convert mask to NumPy array for dilation
             mask_np = np.array(mask)
 
-            # Calculate the dilation kernel size as 5% of the minimum dimension
-            expansion_percentage = 0.05
+            # Calculate the dilation kernel size as 2% of the minimum dimension
+            expansion_percentage = 0.02
             min_dim = min(image.width, image.height)
             kernel_size = max(1, int(expansion_percentage * min_dim))
 
@@ -437,11 +387,6 @@ class FaceDetailer:
             # Apply Gaussian blur for smoother edges
             if self.blur_radius > 0:
                 mask_dilated = mask_dilated.filter(ImageFilter.GaussianBlur(radius=self.blur_radius))
-
-            # Save the dilated mask as a debug image
-            # dilated_mask_debug_path = f"debug_images/dilated_mask_face_{idx}_{self.timestamp}.png"
-            # mask_dilated.save(dilated_mask_debug_path)
-            # logger.info(f"Dilated mask for face {idx} saved at {dilated_mask_debug_path}")
 
             return mask_dilated
 

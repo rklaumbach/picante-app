@@ -32,7 +32,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         width=1024
     ):
         """
-        Initialize the UltimateWorkflow.
+        Initialize the Txt2ImgFaceDetailUpscaleWorkflow.
         """
         self.device = device
         self.steps = [step.strip().lower() for step in steps.split(',')]
@@ -45,24 +45,6 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         self.height = height
         self.width = width
 
-        # Setup output directories
-        # self.setup_directories()
-
-    # def setup_directories(self):
-    #     """
-    #     Create necessary directories for saving images.
-    #     """
-    #     self.output_dirs = {
-    #         'txt2img': 'txt2img',
-    #         'post_face_fix': 'post_face_fix',
-    #         'post_gfpgan': 'post_gfpgan',
-    #         'post_hand_fix': 'post_hand_fix',
-    #          'upscaled': 'upscaled'
-    #      }
-
-    #     for dir_path in self.output_dirs.values():
-    #         os.makedirs(dir_path, exist_ok=True)
-
     def should_run_step(self, selected_steps):
         """
         Determine whether to run a specific step based on the selected workflow steps.
@@ -72,7 +54,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
     def run(self):
         try:
-            image = None
+            images = {}
 
             # Step 1: Image Generation
             if self.should_run_step(['all', 'txt2img']):
@@ -81,18 +63,15 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                     height=self.height,
                     width=self.width
                 )
-                image = image_generator.generate_image(
+                generated_image = image_generator.generate_image(
                     self.image_prompt,
                     negative_prompt=self.negative_prompt
                 )
-                if image is None:
+                if generated_image is None:
                     logger.error("Image generation failed. Exiting workflow.")
                     return None
 
-                # Save the generated image
-                # txt2img_save_path = os.path.join(self.output_dirs['txt2img'], f"{self.timestamp}_txt2img.png")
-                # image.save(txt2img_save_path)
-                # logger.info(f"Image saved at {txt2img_save_path}")
+                images['txt2img_result'] = generated_image
 
                 # Unload the txt2img pipeline to free up GPU memory
                 if hasattr(image_generator, 'pipe') and image_generator.pipe is not None:
@@ -107,7 +86,9 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
             # Step 2: Face Enhancement
             if self.should_run_step(['all', 'face_fix']):
-                if image is None:
+                if 'txt2img_result' in images:
+                    face_input_image = images['txt2img_result']
+                else:
                     logger.error("No image available for face enhancement. Exiting workflow.")
                     return None
 
@@ -117,19 +98,17 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                     width=self.width,
                     timestamp=self.timestamp
                 )
-                image = face_detailer.enhance_faces(
-                    image,
+                face_results = face_detailer.enhance_faces(
+                    face_input_image,
                     face_prompt=self.face_prompt,
                     face_negative_prompt=self.face_negative_prompt
                 )
-                if image is None:
+                if face_results is None:
                     logger.error("Face enhancement failed. Exiting workflow.")
                     return None
 
-                # Save the face-enhanced image
-                # face_fix_save_path = os.path.join(self.output_dirs['post_face_fix'], f"{self.timestamp}_post_face_fix.png")
-                # image.save(face_fix_save_path)
-                # logger.info(f"Image saved at {face_fix_save_path}")
+                images['face_detailer_result'] = face_results.get('enhanced_face', face_input_image)
+                images['debug_images'] = face_results.get('debug_images', {})
 
                 # Unload the face_detailer pipeline
                 if hasattr(face_detailer, 'pipe') and face_detailer.pipe is not None:
@@ -142,23 +121,23 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                 torch.cuda.empty_cache()
                 gc.collect()
 
-            # Step 4: Upscaling
+            # Step 3: Upscaling
             if self.upscale_enabled and self.should_run_step(['all', 'upscale']):
-                upscaler = RealESRGAN(scale = 2)
-                if image is None:
+                if 'face_detailer_result' in images:
+                    upscaling_input_image = images['face_detailer_result']
+                elif 'txt2img_result' in images:
+                    upscaling_input_image = images['txt2img_result']
+                else:
                     logger.error("No image available for upscaling. Exiting workflow.")
                     return None
 
-                logger.info("Starting upscaling process with RealESRGAN.")
-                image = upscaler.upscale(image)
-                if image is None:
+                upscaler = RealESRGAN(scale=2)
+                upscaled_image = upscaler.upscale(upscaling_input_image)
+                if upscaled_image is None:
                     logger.error("Upscaling failed. Exiting workflow.")
                     return None
 
-                # Save the upscaled image
-                # upscaled_save_path = os.path.join(self.output_dirs['upscaled'], f"{self.timestamp}_upscaled.png")
-                # image.save(upscaled_save_path)
-                # logger.info(f"Upscaled image saved at {upscaled_save_path}")
+                images['upscaled'] = upscaled_image
 
                 # Unload the upscaler pipeline
                 if hasattr(upscaler, 'pipe') and upscaler.pipe is not None:
@@ -171,8 +150,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                 torch.cuda.empty_cache()
                 gc.collect()
 
-            # Return the final image
-            return image
+            # Return the dictionary of all images
+            return images
 
         except Exception as e:
             logger.error(f"Workflow failed: {e}")
@@ -199,6 +178,9 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         width=1024,
         strength=0.7  # Default strength for img2img
     ):
+        """
+        Initialize the Img2ImgFaceDetailUpscaleWorkflow.
+        """
         self.input_image_path = input_image_path
         self.device = device
         self.steps = [step.strip().lower() for step in steps.split(',')]
@@ -211,24 +193,6 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         self.height = height
         self.width = width
         self.strength = strength
-
-        # Setup output directories
-        # self.setup_directories()
-
-    # def setup_directories(self):
-    #     """
-    #     Create necessary directories for saving images.
-    #     """
-    #     self.output_dirs = {
-    #         'img2img': 'img2img',
-    #         'post_face_fix': 'post_face_fix',
-    #         'post_gfpgan': 'post_gfpgan',
-    #         'post_hand_fix': 'post_hand_fix',
-    #         'upscaled': 'upscaled'
-    #     }
-
-    #     for dir_path in self.output_dirs.values():
-    #         os.makedirs(dir_path, exist_ok=True)
 
     def should_run_step(self, selected_steps):
         """
@@ -250,23 +214,19 @@ class Img2ImgFaceDetailUpscaleWorkflow:
 
     def run(self):
         try:
-            # Load the input image
-            if self.should_run_step(['all', 'img2img']):
-                input_image = self.load_input_image()
-            else:
-                input_image = None
-
-            image = None
+            images = {}
 
             # Step 1: Image Generation (Img2Img)
             if self.should_run_step(['all', 'img2img']):
-                logger.info("Starting Img2Img image generation.")
+                input_image = self.load_input_image()
+                images['input_image'] = input_image
+
                 image_generator = ImageGenerator(
                     device=self.device,
                     height=self.height,
                     width=self.width
                 )
-                image = image_generator.generate_image(
+                generated_image = image_generator.generate_image(
                     image_prompt=self.image_prompt,
                     negative_prompt=self.negative_prompt,
                     image=input_image,
@@ -274,14 +234,11 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                     num_inference_steps=24,  # Adjust as needed
                     guidance_scale=6.5        # Adjust as needed
                 )
-                if image is None:
+                if generated_image is None:
                     logger.error("Image generation (img2img) failed. Exiting workflow.")
                     return None
 
-                # Save the generated image
-                # img2img_save_path = os.path.join(self.output_dirs['img2img'], f"{self.timestamp}_img2img.png")
-                # image.save(img2img_save_path)
-                # logger.info(f"Image saved at {img2img_save_path}")
+                images['img2img_result'] = generated_image
 
                 # Unload the img2img pipeline to free up GPU memory
                 if hasattr(image_generator, 'pipe') and image_generator.pipe is not None:
@@ -296,7 +253,11 @@ class Img2ImgFaceDetailUpscaleWorkflow:
 
             # Step 2: Face Enhancement
             if self.should_run_step(['all', 'face_fix']):
-                if image is None:
+                if 'img2img_result' in images:
+                    face_input_image = images['img2img_result']
+                elif 'input_image' in images:
+                    face_input_image = images['input_image']
+                else:
                     logger.error("No image available for face enhancement. Exiting workflow.")
                     return None
 
@@ -306,19 +267,17 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                     width=self.width,
                     timestamp=self.timestamp
                 )
-                image = face_detailer.enhance_faces(
-                    image,
+                face_results = face_detailer.enhance_faces(
+                    face_input_image,
                     face_prompt=self.face_prompt,
                     face_negative_prompt=self.face_negative_prompt
                 )
-                if image is None:
+                if face_results is None:
                     logger.error("Face enhancement failed. Exiting workflow.")
                     return None
 
-                # # Save the face-enhanced image
-                # face_fix_save_path = os.path.join(self.output_dirs['post_face_fix'], f"{self.timestamp}_post_face_fix.png")
-                # image.save(face_fix_save_path)
-                # logger.info(f"Image saved at {face_fix_save_path}")
+                images['face_detailer_result'] = face_results.get('enhanced_face', face_input_image)
+                images['debug_images'] = face_results.get('debug_images', {})
 
                 # Unload the face_detailer pipeline
                 if hasattr(face_detailer, 'pipe') and face_detailer.pipe is not None:
@@ -331,23 +290,25 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                 torch.cuda.empty_cache()
                 gc.collect()
 
-            # Step 4: Upscaling
+            # Step 3: Upscaling
             if self.upscale_enabled and self.should_run_step(['all', 'upscale']):
-                upscaler = RealESRGAN(scale = 2)
-                if image is None:
+                if 'face_detailer_result' in images:
+                    upscaling_input_image = images['face_detailer_result']
+                elif 'img2img_result' in images:
+                    upscaling_input_image = images['img2img_result']
+                elif 'input_image' in images:
+                    upscaling_input_image = images['input_image']
+                else:
                     logger.error("No image available for upscaling. Exiting workflow.")
                     return None
 
-                logger.info("Starting upscaling process with RealESRGAN.")
-                image = upscaler.upscale(image)
-                if image is None:
+                upscaler = RealESRGAN(scale=2)
+                upscaled_image = upscaler.upscale(upscaling_input_image)
+                if upscaled_image is None:
                     logger.error("Upscaling failed. Exiting workflow.")
                     return None
 
-                # # Save the upscaled image
-                # upscaled_save_path = os.path.join(self.output_dirs['upscaled'], f"{self.timestamp}_upscaled.png")
-                # image.save(upscaled_save_path)
-                # logger.info(f"Upscaled image saved at {upscaled_save_path}")
+                images['upscaled'] = upscaled_image
 
                 # Unload the upscaler pipeline
                 if hasattr(upscaler, 'pipe') and upscaler.pipe is not None:
@@ -360,9 +321,13 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                 torch.cuda.empty_cache()
                 gc.collect()
 
-            # Return the final image
-            return image
+            # Return the dictionary of all images
+            return images
 
         except Exception as e:
             logger.error(f"Workflow failed: {e}")
             raise
+        finally:
+            # Final cleanup to ensure all references are deleted
+            torch.cuda.empty_cache()
+            gc.collect()

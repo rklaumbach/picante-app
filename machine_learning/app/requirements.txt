@@ -17,4 +17,5 @@ opencv-python
 transformers
 accelerate
 safetensors
-google-cloud-storage
+#google-cloud-storage
+supabase

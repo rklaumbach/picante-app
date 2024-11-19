@@ -69,7 +69,7 @@ class ImageGenerator:
         self,
         image_prompt,
         negative_prompt="...",
-        num_inference_steps=24,
+        num_inference_steps=30,
         guidance_scale=6.5,
         image=None,          # Optional: PIL.Image.Image, np.ndarray, or torch.Tensor for img2img
         strength=0.3         # Optional: Strength parameter for img2img

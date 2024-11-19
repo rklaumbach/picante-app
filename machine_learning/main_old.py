@@ -5,11 +5,11 @@ import argparse
 import os
 import warnings
 import gc
-from .stages.image_generator import ImageGenerator
-from .stages.hand_detailer import HandDetailer
-from .stages.face_detailer import FaceDetailer
-from .stages.face_enhance import GFPGANEnhancer
-from .stages.upscaler import RealESRGANUpscaler
+from app.stages.image_generator import ImageGenerator
+from app.stages.hand_detailer import HandDetailer
+from app.stages.face_detailer import FaceDetailer
+from app.stages.face_enhance import GFPGANEnhancer
+from app.stages.upscaler import RealESRGANUpscaler
 
 
 # Suppress the specific deprecated warning from protobuf

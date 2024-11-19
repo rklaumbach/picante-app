@@ -1,0 +1,16 @@
+/* frontend/src/styles/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles */
+
+/* Set the entire page background to light grey */
+body {
+  @apply bg-gray-300;
+}
+
+/* Define a reusable container class for main content */
+.app-container {
+  @apply bg-red-500 border-2 border-red-800 shadow-lg rounded-lg p-6;
+}
