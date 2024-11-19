@@ -13,6 +13,11 @@ const handler = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        // Ensure credentials are provided
+        if (!credentials) {
+          throw new Error('No credentials provided.');
+        }
+
         const { email, password } = credentials as {
           email: string;
           password: string;
@@ -42,13 +47,18 @@ const handler = NextAuth({
             throw new Error('Please confirm your email before logging in.');
           }
 
+          // Ensure email is defined
+          if (!data.user.email) {
+            throw new Error('User email is undefined.');
+          }
+
           // Return the user object as expected by NextAuth.js
           return {
             id: data.user.id,
-            email: data.user.email,
+            email: data.user.email, // Now guaranteed to be string
             // Add any other user properties you want to include
           };
-        } catch (error) {
+        } catch (error: any) {
           console.error('Authorize error:', error);
           throw new Error(error.message || 'Invalid email or password.');
         }
