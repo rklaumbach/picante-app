@@ -36,6 +36,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onClose }) => {
     } else {
       onClose();
       toast.success('Logged in successfully!');
+      console.log('Redirecting to /generate');
       router.push('/generate');
     }
   };
