@@ -68,9 +68,11 @@ const GalleryPage: React.FC = () => {
     if (!imageToDelete) return;
 
     try {
-      const response = await fetch(`/api/images/${imageToDelete}`, {
+      const response = await fetch(`/api/images/delete?image_id=${imageToDelete}`, {
         method: 'DELETE',
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.ok) {

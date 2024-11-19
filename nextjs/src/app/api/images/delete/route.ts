@@ -1,10 +1,9 @@
-// src/app/api/images/[id]/route.ts
+// src/app/api/images/delete/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { createClient } from '@supabase/supabase-js';
 
-// Define the expected structure of your Image object
 interface Image {
   id: string;
   image_path: string;
@@ -16,12 +15,7 @@ interface Image {
   created_at: string;
 }
 
-export async function DELETE(
-  req: NextRequest,
-  context: { params: { id: string }; searchParams: URLSearchParams }
-): Promise<NextResponse> {
-  const imageId = context.params.id;
-
+export async function DELETE(req: NextRequest): Promise<NextResponse> {
   try {
     // Authenticate the user
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -30,6 +24,17 @@ export async function DELETE(
     }
 
     const userId = token.sub as string;
+
+    // Parse the URL to get query parameters
+    const { searchParams } = new URL(req.url);
+    const imageId = searchParams.get('image_id');
+
+    if (!imageId) {
+      return NextResponse.json(
+        { error: 'image_id query parameter is required.' },
+        { status: 400 }
+      );
+    }
 
     // Initialize Supabase client with Service Role Key
     const supabase = createClient(
@@ -61,7 +66,10 @@ export async function DELETE(
 
     if (deleteError) {
       console.error('Error deleting image from storage:', deleteError);
-      return NextResponse.json({ error: 'Failed to delete image from storage.' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to delete image from storage.' },
+        { status: 500 }
+      );
     }
 
     // Delete the image record from the database
@@ -72,12 +80,15 @@ export async function DELETE(
 
     if (dbDeleteError) {
       console.error('Error deleting image from database:', dbDeleteError);
-      return NextResponse.json({ error: 'Failed to delete image record.' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to delete image record.' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ message: 'Image deleted successfully.' }, { status: 200 });
   } catch (error) {
-    console.error('Error in DELETE /api/images/[id]:', error);
+    console.error('Error in DELETE /api/images/delete:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
