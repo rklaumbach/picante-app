@@ -414,7 +414,7 @@ def process_txt2img(job: Dict):
             # Insert into 'images' table with proper timestamp
             supabase_admin.from_("images").insert({
                 "user_id": user_id,
-                "image_url": image_url,
+                "image_path": f"{user_id}/{filename}",
                 "filename": filename,
                 "body_prompt": job.get('image_prompt', ''),
                 "face_prompt": job.get('face_prompt', ''),
