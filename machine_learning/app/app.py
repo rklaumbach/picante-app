@@ -91,12 +91,15 @@ class Txt2ImgRequest(BaseModel):
         "double_chin, mismatched_irises, extra_pupils, no_pupils, mismatched_pupils, "
         "no_sclera, mismatched_sclera, cross_eyed, no_mouth, "
     )
-    res: str = '1024x1024'
+    width: int = 1024
+    height: int = 1024
     scaling: int = 2
 
-class Img2ImgResponse(BaseModel):
+class ImgResponse(BaseModel):
     job_id: str
     status: str
+    width: int
+    height: int
 
 class JobStatusResponse(BaseModel):
     status: str
@@ -171,17 +174,12 @@ def upload_image_to_supabase(image_bytes: bytes, user_id: str, filename: str) ->
         raise
 
 # Define FastAPI routes
-@fastapi_app.post("/generate-txt2img", response_model=Img2ImgResponse)
+@fastapi_app.post("/generate-txt2img", response_model=ImgResponse)
 async def generate_txt2img(request: Txt2ImgRequest):
     """
     Endpoint to submit a Txt2Img image generation job.
     """
-    # Parse resolution
-    try:
-        width, height = map(int, request.res.lower().split('x'))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid resolution format. Use WIDTHxHEIGHT, e.g., 1024x1024.")
-    
+
     # Create a unique job ID and timestamp
     job_id = str(uuid4())
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -197,8 +195,8 @@ async def generate_txt2img(request: Txt2ImgRequest):
         'negative_prompt': request.negative_prompt,
         'face_prompt': request.face_prompt,
         'face_negative_prompt': request.face_negative_prompt,
-        'height': height,
-        'width': width,
+        'height': request.height,
+        'width': request.width,
         'device': 'cuda',  # Or make this configurable
         'scaling': request.scaling
     }
@@ -214,11 +212,11 @@ async def generate_txt2img(request: Txt2ImgRequest):
         'timestamp': timestamp
     }
     
-    return Img2ImgResponse(job_id=job_id, status='queued')
+    return ImgResponse(job_id=job_id, status='queued')
 
-@fastapi_app.post("/generate-img2img", response_model=Img2ImgResponse)
+@fastapi_app.post("/generate-img2img", response_model=ImgResponse)
 async def generate_img2img(
-    user_id: str = Form(...),  # Added user_id as a required Form field
+    user_id: str = Form(...),  # Required Form field
     steps: str = Form('all'),
     upscale_enabled: bool = Form(True),
     image_prompt: str = Form(...),
@@ -236,18 +234,17 @@ async def generate_img2img(
         "double_chin, mismatched_irises, extra_pupils, no_pupils, mismatched_pupils, "
         "no_sclera, mismatched_sclera, cross_eyed, no_mouth, hands, fingers, hands_on_own_face, hands_on_own_chin"
     ),
-    res: str = Form('1024x1024'),
+    width: int = Form(...),  # Changed from 'res' to 'width'
+    height: int = Form(...),  # Added 'height' instead of parsing 'res'
     strength: float = Form(0.7),
     file: UploadFile = File(...)
 ):
     """
     Endpoint to submit an Img2Img image generation job.
     """
-    # Validate resolution
-    try:
-        width, height = map(int, res.lower().split('x'))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid resolution format. Use WIDTHxHEIGHT, e.g., 1024x1024.")
+    # Validate width and height
+    if width <= 0 or height <= 0:
+        raise HTTPException(status_code=400, detail="Width and height must be positive integers.")
     
     # Save the uploaded image to a temporary location within Modal's container
     try:
@@ -296,7 +293,7 @@ async def generate_img2img(
         'timestamp': timestamp
     }
     
-    return Img2ImgResponse(job_id=job_id, status='queued')
+    return ImgResponse(job_id=job_id, status='queued')
 
 @fastapi_app.get("/job-status/{job_id}", response_model=JobStatusResponse)
 def get_job_status(job_id: str):
@@ -371,7 +368,8 @@ def process_txt2img(job: Dict):
                 "filename": filename,
                 "body_prompt": job.get('image_prompt', ''),
                 "face_prompt": job.get('face_prompt', ''),
-                "resolution": f"{job.get('width', 1024)}x{job.get('height', 1024)}",
+                "width": job.get('width')*job.get('scaling'),
+                "height": job.get('height')*job.get('scaling'),
                 "created_at": job.get('timestamp')  # Actual timestamp
             }).execute()
 
@@ -386,7 +384,10 @@ def process_txt2img(job: Dict):
             job_results[job.get('job_id')] = job_info
 
             logger.info(f"Job {job.get('job_id')} completed successfully.")
-            return {'status': 'completed', 'image_urls': {'final_image': image_url}}
+            return {'status': 'completed',
+                    'image_urls': {'final_image': image_url},
+                    'width': job.get('width')*job.get('scaling'),
+                    'height': job.get('height')*job.get('scaling')}
         else:
             # Update job status to failed
             job_info = job_results.get(job.get('job_id'))
@@ -452,11 +453,12 @@ def process_img2img(job: Dict):
             # Insert into 'images' table with proper timestamp
             supabase_admin.from_("images").insert({
                 "user_id": user_id,
-                "image_url": image_url,
+                "image_path": f"{user_id}/{filename}",
                 "filename": filename,
                 "body_prompt": job.get('image_prompt', ''),
                 "face_prompt": job.get('face_prompt', ''),
-                "resolution": f"{job.get('width', 1024)}x{job.get('height', 1024)}",
+                "width": job.get('width')*job.get('scaling'),
+                "height": job.get('height')*job.get('scaling'),
                 "created_at": job.get('timestamp')  # Actual timestamp
             }).execute()
 
@@ -471,7 +473,10 @@ def process_img2img(job: Dict):
             job_results[job.get('job_id')] = job_info
 
             logger.info(f"Job {job.get('job_id')} completed successfully.")
-            return {'status': 'completed', 'image_urls': {'final_image': image_url}}
+            return {'status': 'completed',
+                    'image_urls': {'final_image': image_url},
+                    'width': job.get('width')*job.get('scaling'),
+                    'height': job.get('height')*job.get('scaling')}
         else:
             # Update job status to failed
             job_info = job_results.get(job.get('job_id'))

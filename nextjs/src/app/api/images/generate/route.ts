@@ -5,9 +5,11 @@ import { getToken } from 'next-auth/jwt';
 import { createClient } from '@supabase/supabase-js';
 
 interface Txt2ImgRequestBody {
+  user_id: string;
   bodyPrompt: string;
   facePrompt: string;
-  res: string;
+  width: number;
+  height: number;
   upscaleEnabled: boolean;
   upscaleFactor: 2 | 4;
 }
@@ -15,6 +17,12 @@ interface Txt2ImgRequestBody {
 interface GenerateResponse {
   job_id: string;
   status: string;
+  width?: number;
+  height?: number;
+  image_urls?: {
+    final_image: string;
+  };
+  error?: string;
 }
 
 const MODAL_API_URL = process.env.MODAL_API_URL!;
@@ -39,9 +47,9 @@ export async function POST(req: NextRequest) {
     // Parse the request body
     const body: Txt2ImgRequestBody = await req.json();
 
-    const { bodyPrompt, facePrompt, res, upscaleEnabled, upscaleFactor } = body;
+    const { bodyPrompt, facePrompt, width, height, upscaleEnabled, upscaleFactor } = body;
 
-    if (!bodyPrompt || !facePrompt || !res) {
+    if (!bodyPrompt || !facePrompt || !width || !height) {
       return NextResponse.json(
         { error: 'bodyPrompt, facePrompt, and res are required.' },
         { status: 400 }
@@ -53,7 +61,8 @@ export async function POST(req: NextRequest) {
       user_id: userId, // Include user_id from token
       image_prompt: bodyPrompt,
       face_prompt: facePrompt,
-      res,
+      width : width,
+      height : height,
       upscale_enabled: upscaleEnabled,
       scaling: upscaleFactor,
     };

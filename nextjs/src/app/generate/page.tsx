@@ -32,7 +32,9 @@ const GenerateImagePage: React.FC = () => {
   const [isOutOfCreditsDialogOpen, setIsOutOfCreditsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [credits, setCredits] = useState<number>(0); // Initialize to 0
-  const [res, setRes] = useState<string>('1024x1024'); // Default resolution
+  const [width, setWidth] = useState<number>(1024); // Default resolution
+  const [height, setHeight] = useState<number>(1024); // Default resolution
+
   const [upscaleEnabled, setUpscaleEnabled] = useState<boolean>(false);
   const [upscaleFactor, setUpscaleFactor] = useState<2 | 4>(2);
 
@@ -108,7 +110,8 @@ const GenerateImagePage: React.FC = () => {
           user_id: userId, 
           bodyPrompt, 
           facePrompt, 
-          res, 
+          width,
+          height, 
           upscaleEnabled, 
           upscaleFactor 
         }),
@@ -260,35 +263,47 @@ const GenerateImagePage: React.FC = () => {
               <label className="inline-flex items-center text-xl">
                 <input
                   type="radio"
-                  name="res"
+                  name="resolution"
                   value="720x1280"
-                  checked={res === '720x1280'}
-                  onChange={(e) => setRes(e.target.value)}
+                  checked={width === 720 && height === 1280}
+                  onChange={(e) => {
+                    const [w, h] = e.target.value.split('x').map(Number);
+                    setWidth(w);
+                    setHeight(h);
+                  }}
                   className="form-radio h-6 w-6 text-blue-600"
                 />
-                <span className="ml-4">Portrait (720x1280)</span>
+                <span className="ml-4">Portrait (9:16)</span>
               </label>
               <label className="inline-flex items-center text-xl">
                 <input
                   type="radio"
-                  name="res"
+                  name="resolution"
                   value="1024x1024"
-                  checked={res === '1024x1024'}
-                  onChange={(e) => setRes(e.target.value)}
+                  checked={width === 1024 && height === 1024}
+                  onChange={(e) => {
+                    const [w, h] = e.target.value.split('x').map(Number);
+                    setWidth(w);
+                    setHeight(h);
+                  }}
                   className="form-radio h-6 w-6 text-blue-600"
                 />
-                <span className="ml-4">Square (1024x1024)</span>
+                <span className="ml-4">Square (1:1)</span>
               </label>
               <label className="inline-flex items-center text-xl">
                 <input
                   type="radio"
-                  name="res"
+                  name="resolution"
                   value="1280x720"
-                  checked={res === '1280x720'}
-                  onChange={(e) => setRes(e.target.value)}
+                  checked={width === 1280 && height === 720}
+                  onChange={(e) => {
+                    const [w, h] = e.target.value.split('x').map(Number);
+                    setWidth(w);
+                    setHeight(h);
+                  }}
                   className="form-radio h-6 w-6 text-blue-600"
                 />
-                <span className="ml-4">Landscape (1280x720)</span>
+                <span className="ml-4">Landscape (16:9)</span>
               </label>
               {/* Add more resolutions as needed */}
             </div>
