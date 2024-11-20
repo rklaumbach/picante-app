@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Combobox } from '@headlessui/react';
+import { Combobox, Label, ComboboxInput, ComboboxButton, ComboboxOptions, ComboboxOption } from '@headlessui/react';
 import React, { useState, useEffect, Fragment, useRef } from 'react';
 
 // Define the structure for each selected tag with its weight
@@ -110,53 +110,17 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
 
   return (
     <div className="w-full mb-6">
-      {/* Combobox for Tag Autocomplete */}
-      <Combobox onChange={handleSelection} nullable>
-        <Combobox.Label className="block text-xl font-bold text-gray-700 mb-3">{label}:</Combobox.Label>
-        <div className="relative">
-          <Combobox.Input
-            ref={inputRef}
-            className="w-full border border-gray-400 rounded-md shadow-sm pl-4 pr-10 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xl"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Start typing to add tags"
-            displayValue={(tag: string) => tag}
-          />
-          <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-            {/* Optional: Add an icon here if desired */}
-            {/* Example: ChevronDownIcon */}
-          </Combobox.Button>
-
-          {filteredTags.length > 0 && (
-            <Combobox.Options className="absolute z-10 mt-2 w-full bg-white shadow-lg max-h-72 rounded-md py-2 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-xl">
-              {filteredTags.map((tag) => (
-                <Combobox.Option key={tag} value={tag} as={Fragment}>
-                  {({ active }) => (
-                    <li
-                      className={`cursor-pointer select-none relative py-3 pl-5 pr-5 ${
-                        active ? 'bg-blue-600 text-white' : 'text-gray-900'
-                      }`}
-                    >
-                      <span className="block truncate">{tag}</span>
-                    </li>
-                  )}
-                </Combobox.Option>
-              ))}
-            </Combobox.Options>
-          )}
-        </div>
-      </Combobox>
-
       {/* Display Selected Tags as Removable Chips */}
       <div className="flex flex-wrap mt-6 gap-4">
         {selectedTags.map((selectedTag, index) => (
           <div
             key={`${selectedTag.tag}-${index}`}
-            className="flex items-center bg-blue-200 text-blue-900 px-6 py-3 rounded-full text-2xl"
+            className="flex items-center bg-blue-200 text-blue-900 px-3 py-1 rounded-full text-2xl"
           >
             {/* Decrease Weight Button */}
             <button
               onClick={() => handleDecreaseWeight(index)}
-              className="text-blue-700 hover:text-blue-900 focus:outline-none p-4"
+              className="text-blue-700 hover:text-blue-900 focus:outline-none p-2"
               aria-label={`Decrease weight of ${selectedTag.tag}`}
             >
               &minus;
@@ -165,7 +129,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
             {/* Increase Weight Button */}
             <button
               onClick={() => handleIncreaseWeight(index)}
-              className="text-blue-700 hover:text-blue-900 focus:outline-none p-4"
+              className="text-blue-700 hover:text-blue-900 focus:outline-none p-2"
               aria-label={`Increase weight of ${selectedTag.tag}`}
             >
               +
@@ -187,6 +151,42 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
           </div>
         ))}
       </div>
+
+      {/* Combobox for Tag Autocomplete */}
+      <Combobox onChange={handleSelection} nullable>
+        <Label className="block text-xl font-bold text-gray-700 mb-3">{label}:</Label>
+        <div className="relative">
+          <ComboboxInput
+            ref={inputRef}
+            className="w-full border border-gray-400 rounded-md shadow-sm pl-4 pr-10 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xl"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Start typing to add tags"
+            displayValue={(tag: string) => tag}
+          />
+          <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+            {/* Optional: Add an icon here if desired */}
+            {/* Example: ChevronDownIcon */}
+          </ComboboxButton>
+
+          {filteredTags.length > 0 && (
+            <ComboboxOptions className="absolute z-10 mt-2 w-full bg-white shadow-lg max-h-72 rounded-md py-2 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-xl">
+              {filteredTags.map((tag) => (
+                <ComboboxOption key={tag} value={tag} as={Fragment}>
+                  {({ active }) => (
+                    <li
+                      className={`cursor-pointer select-none relative py-3 pl-5 pr-5 ${
+                        active ? 'bg-blue-600 text-white' : 'text-gray-900'
+                      }`}
+                    >
+                      <span className="block truncate">{tag}</span>
+                    </li>
+                  )}
+                </ComboboxOption>
+              ))}
+            </ComboboxOptions>
+          )}
+        </div>
+      </Combobox>
     </div>
   );
 };

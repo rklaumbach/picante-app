@@ -157,7 +157,7 @@ const GalleryPage: React.FC = () => {
           <h2 className="text-2xl font-semibold mt-6 text-black">Your Images:</h2>
 
           {/* Scrollable Image Gallery */}
-          <div className="w-full mt-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-2">
+          <div className="w-full h-full mt-4 overflow-y-auto overflow-x-hidden px-2">
             {images.length === 0 ? (
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
