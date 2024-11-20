@@ -1,7 +1,7 @@
 # workflows.py
 
 import torch
-from loguru import logger
+import logging
 from datetime import datetime
 import os
 import warnings
@@ -16,6 +16,8 @@ from PIL import Image
 # Suppress the specific deprecated warning from protobuf
 warnings.filterwarnings("ignore", category=UserWarning, message="SymbolDatabase.GetPrototype() is deprecated")
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class Txt2ImgFaceDetailUpscaleWorkflow:
     def __init__(
@@ -53,8 +55,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         """
         return any(step in self.steps for step in selected_steps)
 
-
     def run(self):
+        logger.info(f"Scaling in Txt2ImgFaceDetailUpscaleWorkflow = {self.scaling}")
         try:
             images = {}
 
@@ -73,7 +75,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                     logger.error("Image generation failed. Exiting workflow.")
                     return None
 
-                images['txt2img_result'] = generated_image
+                images['final_image'] = generated_image
 
                 # Unload the txt2img pipeline to free up GPU memory
                 if hasattr(image_generator, 'pipe') and image_generator.pipe is not None:
@@ -88,8 +90,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
             # Step 2: Face Enhancement
             if self.should_run_step(['all', 'face_fix']):
-                if 'txt2img_result' in images:
-                    face_input_image = images['txt2img_result']
+                if 'final_image' in images:
+                    face_input_image = images['final_image']
                 else:
                     logger.error("No image available for face enhancement. Exiting workflow.")
                     return None
@@ -109,8 +111,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                     logger.error("Face enhancement failed. Exiting workflow.")
                     return None
 
-                images['face_detailer_result'] = face_results.get('enhanced_face', face_input_image)
-                images['debug_images'] = face_results.get('debug_images', {})
+                images['final_image'] = face_results.get('enhanced_face', face_input_image)
 
                 # Unload the face_detailer pipeline
                 if hasattr(face_detailer, 'pipe') and face_detailer.pipe is not None:
@@ -125,10 +126,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
             # Step 3: Upscaling
             if self.upscale_enabled and self.should_run_step(['all', 'upscale']):
-                if 'face_detailer_result' in images:
-                    upscaling_input_image = images['face_detailer_result']
-                elif 'txt2img_result' in images:
-                    upscaling_input_image = images['txt2img_result']
+                if 'final_image' in images:
+                    upscaling_input_image = images['final_image']
                 else:
                     logger.error("No image available for upscaling. Exiting workflow.")
                     return None
@@ -139,7 +138,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                     logger.error("Upscaling failed. Exiting workflow.")
                     return None
 
-                images['upscaled'] = upscaled_image
+                images['final_image'] = upscaled_image
 
                 # Unload the upscaler pipeline
                 if hasattr(upscaler, 'pipe') and upscaler.pipe is not None:
@@ -152,7 +151,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                 torch.cuda.empty_cache()
                 gc.collect()
 
-            # Return the dictionary of all images
+            # Return the dictionary with only 'final_image'
             return images
 
         except Exception as e:
@@ -223,7 +222,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
             # Step 1: Image Generation (Img2Img)
             if self.should_run_step(['all', 'img2img']):
                 input_image = self.load_input_image()
-                images['input_image'] = input_image
+                images['final_image'] = input_image  # Initialize with input_image
 
                 image_generator = ImageGenerator(
                     device=self.device,
@@ -242,7 +241,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                     logger.error("Image generation (img2img) failed. Exiting workflow.")
                     return None
 
-                images['img2img_result'] = generated_image
+                images['final_image'] = generated_image
 
                 # Unload the img2img pipeline to free up GPU memory
                 if hasattr(image_generator, 'pipe') and image_generator.pipe is not None:
@@ -257,10 +256,8 @@ class Img2ImgFaceDetailUpscaleWorkflow:
 
             # Step 2: Face Enhancement
             if self.should_run_step(['all', 'face_fix']):
-                if 'img2img_result' in images:
-                    face_input_image = images['img2img_result']
-                elif 'input_image' in images:
-                    face_input_image = images['input_image']
+                if 'final_image' in images:
+                    face_input_image = images['final_image']
                 else:
                     logger.error("No image available for face enhancement. Exiting workflow.")
                     return None
@@ -280,8 +277,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                     logger.error("Face enhancement failed. Exiting workflow.")
                     return None
 
-                images['face_detailer_result'] = face_results.get('enhanced_face', face_input_image)
-                images['debug_images'] = face_results.get('debug_images', {})
+                images['final_image'] = face_results.get('enhanced_face', face_input_image)
 
                 # Unload the face_detailer pipeline
                 if hasattr(face_detailer, 'pipe') and face_detailer.pipe is not None:
@@ -296,12 +292,8 @@ class Img2ImgFaceDetailUpscaleWorkflow:
 
             # Step 3: Upscaling
             if self.upscale_enabled and self.should_run_step(['all', 'upscale']):
-                if 'face_detailer_result' in images:
-                    upscaling_input_image = images['face_detailer_result']
-                elif 'img2img_result' in images:
-                    upscaling_input_image = images['img2img_result']
-                elif 'input_image' in images:
-                    upscaling_input_image = images['input_image']
+                if 'final_image' in images:
+                    upscaling_input_image = images['final_image']
                 else:
                     logger.error("No image available for upscaling. Exiting workflow.")
                     return None
@@ -312,7 +304,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                     logger.error("Upscaling failed. Exiting workflow.")
                     return None
 
-                images['upscaled'] = upscaled_image
+                images['final_image'] = upscaled_image
 
                 # Unload the upscaler pipeline
                 if hasattr(upscaler, 'pipe') and upscaler.pipe is not None:
@@ -325,7 +317,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                 torch.cuda.empty_cache()
                 gc.collect()
 
-            # Return the dictionary of all images
+            # Return the dictionary with only 'final_image'
             return images
 
         except Exception as e:

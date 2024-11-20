@@ -170,48 +170,6 @@ def upload_image_to_supabase(image_bytes: bytes, user_id: str, filename: str) ->
         logger.exception("Failed to upload image to Supabase Storage:")
         raise
 
-def upload_images_recursively(images_dict: Dict, job_id: str, user_id: str, prefix: str = "") -> Dict[str, str]:
-    """
-    Recursively upload images in a nested dictionary to Supabase and return their URLs.
-
-    Args:
-        images_dict (Dict): The dictionary containing images or nested dictionaries of images.
-        job_id (str): The unique job identifier.
-        user_id (str): The ID of the user uploading the image.
-        prefix (str): The prefix for the Supabase path.
-
-    Returns:
-        Dict[str, str]: A dictionary mapping image keys to their Supabase signed URLs, including 'final_image'.
-    """
-    image_urls = {}
-    for key, value in images_dict.items():
-        current_prefix = f"{prefix}/{key}" if prefix else key
-        if isinstance(value, Image.Image):
-            try:
-                filename = f"{current_prefix}/{job_id}_final.png"
-                image_bytes = BytesIO()
-                value.save(image_bytes, format='PNG')
-                img_bytes = image_bytes.getvalue()
-                url = upload_image_to_supabase(img_bytes, user_id, filename)
-                image_urls[current_prefix] = url
-                logger.info(f"Uploaded {current_prefix} to Supabase Storage at {url}")
-
-                # Assign to 'final_image' if this is the upscaled image
-                if key.lower() == 'upscaled':
-                    image_urls['final_image'] = url
-                elif key.lower() == 'enhanced_face' and 'final_image' not in image_urls:
-                    image_urls['final_image'] = url
-
-            except Exception as e:
-                logger.error(f"Failed to upload image {current_prefix}: {e}")
-        elif isinstance(value, dict):
-            # Recursively handle nested dictionaries
-            nested_urls = upload_images_recursively(value, job_id, user_id, prefix=current_prefix)
-            image_urls.update(nested_urls)
-        else:
-            logger.warning(f"Unexpected type for key {key}: {type(value)}")
-    return image_urls
-
 # Define FastAPI routes
 @fastapi_app.post("/generate-txt2img", response_model=Img2ImgResponse)
 async def generate_txt2img(request: Txt2ImgRequest):
@@ -383,31 +341,24 @@ def process_txt2img(job: Dict):
             width=job.get('width', 1024),
             scaling=job.get('scaling')
         )
+
+        logger.info(f"Scaling in process_txt2img = {job.get('scaling')}")
         
         images_dict = workflow.run()
         
-        if images_dict:
+        if images_dict and 'final_image' in images_dict:
             user_id = job.get('user_id')  # Ensure user_id is part of the job data
             if not user_id:
                 raise Exception("User ID not provided in job data.")
             
-            # Identify and upload only 'final_image' (either 'upscaled' or 'enhanced_face')
-            final_image_key = None
-            if 'upscaled' in images_dict:
-                final_image_key = 'upscaled'
-            elif 'enhanced_face' in images_dict:
-                final_image_key = 'enhanced_face'
-            else:
-                raise Exception("No final_image key found in generated images.")
-            
-            final_image = images_dict[final_image_key]
+            final_image = images_dict['final_image']
             
             # Convert PIL Image to bytes
             img_byte_arr = BytesIO()
             final_image.save(img_byte_arr, format='PNG')
             img_bytes = img_byte_arr.getvalue()
 
-            # Define a unique filename, e.g., using job_id and key
+            # Define a unique filename, e.g., using timestamp
             filename = f"{job['timestamp']}_final.png"
 
             # Upload to Supabase Storage
@@ -474,33 +425,25 @@ def process_img2img(job: Dict):
             face_negative_prompt=job.get('face_negative_prompt', ""),
             height=job.get('height', 1024),
             width=job.get('width', 1024),
-            strength=job.get('strength', 0.7)
+            strength=job.get('strength', 0.7),
+            scaling=job.get('scaling', 2)
         )
         
         images_dict = workflow.run()
         
-        if images_dict:
+        if images_dict and 'final_image' in images_dict:
             user_id = job.get('user_id')  # Ensure user_id is part of the job data
             if not user_id:
                 raise Exception("User ID not provided in job data.")
             
-            # Identify and upload only 'final_image' (either 'upscaled' or 'enhanced_face')
-            final_image_key = None
-            if 'upscaled' in images_dict:
-                final_image_key = 'upscaled'
-            elif 'enhanced_face' in images_dict:
-                final_image_key = 'enhanced_face'
-            else:
-                raise Exception("No final_image key found in generated images.")
-            
-            final_image = images_dict[final_image_key]
+            final_image = images_dict['final_image']
             
             # Convert PIL Image to bytes
             img_byte_arr = BytesIO()
             final_image.save(img_byte_arr, format='PNG')
             img_bytes = img_byte_arr.getvalue()
 
-            # Define a unique filename, e.g., using job_id and key
+            # Define a unique filename, e.g., using timestamp
             filename = f"{job['timestamp']}_final.png"
 
             # Upload to Supabase Storage
@@ -541,9 +484,12 @@ def process_img2img(job: Dict):
         # Update job status to failed with reason
         logger.exception("Error processing Img2Img job:")
         job_info = job_results.get(job.get('job_id'))
-        job_info['status'] = 'failed'
-        job_info['reason'] = str(e)
-        job_results[job.get('job_id')] = job_info
+        if job_info:
+            job_info['status'] = 'failed'
+            job_info['reason'] = str(e)
+            job_results[job.get('job_id')] = job_info
+        else:
+            logger.error(f"Job ID {job.get('job_id')} not found in job_results.")
         return {'status': 'failed', 'reason': str(e)}
 
 @fastapi_app.get("/verify-installation")

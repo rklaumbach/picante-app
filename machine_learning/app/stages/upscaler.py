@@ -10,6 +10,10 @@ from torch.nn.modules.batchnorm import _BatchNorm
 from PIL import Image
 import numpy as np
 import cv2
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # -------------------- arch_utils.py --------------------
 
@@ -458,6 +462,8 @@ def stich_together(patches, padded_image_shape, target_shape, padding_size=4):
 
 class RealESRGAN:
     def __init__(self, scale=2):
+
+        
         """
         Initializes the RealESRGAN model, loads weights, processes the input image, and saves the output.
 
@@ -467,6 +473,8 @@ class RealESRGAN:
         """
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.scale = scale
+
+        logger.info(f"Scaling in RealESRGAN = {self.scale}")
 
         # Initialize the RRDBNet model
         self.model = RRDBNet(

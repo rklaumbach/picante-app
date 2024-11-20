@@ -34,7 +34,7 @@ const GenerateImagePage: React.FC = () => {
   const [credits, setCredits] = useState<number>(0); // Initialize to 0
   const [res, setRes] = useState<string>('1024x1024'); // Default resolution
   const [upscaleEnabled, setUpscaleEnabled] = useState<boolean>(false);
-  const [upscaleFactor, setUpscaleFactor] = useState<'2x' | '4x'>('2x');
+  const [upscaleFactor, setUpscaleFactor] = useState<2 | 4>(2);
 
   // Fetch user credits upon session availability
   useEffect(() => {
@@ -313,9 +313,9 @@ const GenerateImagePage: React.FC = () => {
                     <input
                       type="radio"
                       name="upscaleFactor"
-                      value="2x"
-                      checked={upscaleFactor === '2x'}
-                      onChange={(e) => setUpscaleFactor(e.target.value as '2x' | '4x')}
+                      value="2"
+                      checked={upscaleFactor === 2}
+                      onChange={(e) => setUpscaleFactor(parseInt(e.target.value) as 2 | 4)}
                       className="form-radio h-6 w-6 text-blue-600"
                     />
                     <span className="ml-4">2x</span>
@@ -324,9 +324,9 @@ const GenerateImagePage: React.FC = () => {
                     <input
                       type="radio"
                       name="upscaleFactor"
-                      value="4x"
-                      checked={upscaleFactor === '4x'}
-                      onChange={(e) => setUpscaleFactor(e.target.value as '2x' | '4x')}
+                      value="4"
+                      checked={upscaleFactor === 4}
+                      onChange={(e) => setUpscaleFactor(parseInt(e.target.value) as 2 | 4)}
                       className="form-radio h-6 w-6 text-blue-600"
                     />
                     <span className="ml-4">4x</span>

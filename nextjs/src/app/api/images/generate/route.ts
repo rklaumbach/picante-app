@@ -9,7 +9,7 @@ interface Txt2ImgRequestBody {
   facePrompt: string;
   res: string;
   upscaleEnabled: boolean;
-  upscaleFactor: '2x' | '4x';
+  upscaleFactor: 2 | 4;
 }
 
 interface GenerateResponse {
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       face_prompt: facePrompt,
       res,
       upscale_enabled: upscaleEnabled,
-      upscale_factor: upscaleFactor,
+      scaling: upscaleFactor,
     };
 
     // Submit the job to the Modal backend
