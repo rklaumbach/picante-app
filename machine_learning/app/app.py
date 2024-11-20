@@ -98,8 +98,8 @@ class Txt2ImgRequest(BaseModel):
 class ImgResponse(BaseModel):
     job_id: str
     status: str
-    width: int
-    height: int
+    width: Optional[int] = None  # Made optional
+    height: Optional[int] = None  # Made optional
 
 class JobStatusResponse(BaseModel):
     status: str
@@ -361,6 +361,9 @@ def process_txt2img(job: Dict):
             # Upload to Supabase Storage
             image_url = upload_image_to_supabase(img_bytes, user_id, filename)
 
+            upscaled_width = job.get('width')*job.get('scaling') if job.get('upscale_enabled') else job.get('width')
+            upscaled_height = job.get('height')*job.get('scaling') if job.get('upscale_enabled') else job.get('height')
+
             # Insert into 'images' table with proper timestamp
             supabase_admin.from_("images").insert({
                 "user_id": user_id,
@@ -368,8 +371,8 @@ def process_txt2img(job: Dict):
                 "filename": filename,
                 "body_prompt": job.get('image_prompt', ''),
                 "face_prompt": job.get('face_prompt', ''),
-                "width": job.get('width')*job.get('scaling'),
-                "height": job.get('height')*job.get('scaling'),
+                "width": upscaled_width,
+                "height": upscaled_height,
                 "created_at": job.get('timestamp')  # Actual timestamp
             }).execute()
 
@@ -450,6 +453,9 @@ def process_img2img(job: Dict):
             # Upload to Supabase Storage
             image_url = upload_image_to_supabase(img_bytes, user_id, filename)
 
+            upscaled_width = job.get('width')*job.get('scaling') if job.get('upscale_enabled') else job.get('width')
+            upscaled_height = job.get('height')*job.get('scaling') if job.get('upscale_enabled') else job.get('height')
+
             # Insert into 'images' table with proper timestamp
             supabase_admin.from_("images").insert({
                 "user_id": user_id,
@@ -457,8 +463,8 @@ def process_img2img(job: Dict):
                 "filename": filename,
                 "body_prompt": job.get('image_prompt', ''),
                 "face_prompt": job.get('face_prompt', ''),
-                "width": job.get('width')*job.get('scaling'),
-                "height": job.get('height')*job.get('scaling'),
+                "width": upscaled_width,
+                "height": upscaled_height,
                 "created_at": job.get('timestamp')  # Actual timestamp
             }).execute()
 
@@ -547,6 +553,8 @@ async def get_job_status_endpoint(job_id: str = Query(...)):
         
         if status == 'completed':
             response['image_urls'] = job.get('image_urls', {})
+            response['width'] = job.get('width')
+            response['height'] = job.get('height')
         elif status == 'failed':
             response['reason'] = job.get('reason', 'Unknown error.')
         
