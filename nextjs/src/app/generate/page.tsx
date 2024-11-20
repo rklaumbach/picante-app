@@ -7,10 +7,13 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import Header from '../../components/Header';
 import Button from '../../components/Button';
 import ImageDisplay from '../../components/ImageDisplay';
+import ImageModal from '../../components/ImageModal';
 import OutOfCreditsDialog from '../../components/OutOfCreditsDialog';
 import BottomNav from '../../components/BottomNav';
 import TagAutocomplete from '../../components/TagAutocomplete';
 import { useRouter } from 'next/navigation';
+import { ImageData } from '@/types/types'; // Import the unified Image interface
+
 
 // Define the structure for each selected tag with its weight
 interface SelectedTag {
@@ -37,6 +40,9 @@ const GenerateImagePage: React.FC = () => {
 
   const [upscaleEnabled, setUpscaleEnabled] = useState<boolean>(false);
   const [upscaleFactor, setUpscaleFactor] = useState<2 | 4>(2);
+  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
+
 
   // Fetch user credits upon session availability
   useEffect(() => {
@@ -192,6 +198,45 @@ const GenerateImagePage: React.FC = () => {
       alert('An error occurred while generating the image.');
       setIsLoading(false);
     }
+  };
+
+  const handleGeneratedImageClick = () => {
+    const image: ImageData = {
+      id: '', // No ID since it's not saved yet
+      image_url: generatedImage,
+      filename: 'Generated Image',
+      body_prompt: bodyTags.map((t) => `${t.tag}:${t.weight}`).join(', '),
+      face_prompt: faceTags.map((t) => `${t.tag}:${t.weight}`).join(', '),
+      width: width,
+      height: height,
+      created_at: new Date().toISOString(),
+    };
+    setSelectedImage(image);
+    setIsImageModalOpen(true);
+  };
+
+  const handleDownload = async (image: ImageData) => {
+    try {
+      const response = await fetch(image.image_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+  
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = image.filename || 'generated_image.png';
+      document.body.appendChild(link);
+      link.click();
+  
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading the image:', error);
+      // Handle error (e.g., show a toast notification)
+    }
+  };
+  
+  const handleFullView = (image: ImageData) => {
+    window.open(image.image_url, '_blank');
   };
 
   // Handle sign-in
@@ -364,7 +409,21 @@ const GenerateImagePage: React.FC = () => {
           />
 
           {/* Display Generated Image */}
-          {generatedImage && <ImageDisplay imageUrl={generatedImage} />}
+          {generatedImage && (
+            <div onClick={handleGeneratedImageClick}>
+              <ImageDisplay imageUrl={generatedImage} width={width} height={height} />
+            </div>
+          )}
+
+          {isImageModalOpen && selectedImage && (
+            <ImageModal
+              image={selectedImage}
+              onClose={() => setIsImageModalOpen(false)}
+              onDownload={() => handleDownload(selectedImage)}
+              onFullView={() => handleFullView(selectedImage)}
+              // Omit the onDelete prop
+            />
+          )}
         </div>
       </main>
       <OutOfCreditsDialog

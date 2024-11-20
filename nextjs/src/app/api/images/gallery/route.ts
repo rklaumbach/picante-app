@@ -4,15 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { createClient } from '@supabase/supabase-js';
 
-interface Image {
-  id: string;
-  image_path: string; // Changed from image_url to image_path
-  filename: string;
-  body_prompt: string;
-  face_prompt: string;
-  resolution: string;
-  created_at: string;
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -64,7 +55,8 @@ export async function GET(req: NextRequest) {
           filename: img.filename,
           body_prompt: img.body_prompt,
           face_prompt: img.face_prompt,
-          resolution: img.resolution,
+          width: img.width,
+          height: img.height,
           created_at: img.created_at,
         };
       })

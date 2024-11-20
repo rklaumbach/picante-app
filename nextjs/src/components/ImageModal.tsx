@@ -1,13 +1,15 @@
 // src/components/ImageModal.tsx
 
 import React from 'react';
-import { Image } from '@/types/types'; // Import the unified Image interface
+import { ImageData } from '@/types/types'; // Import the unified Image interface
+import Image from 'next/image';
+
 
 interface ImageModalProps {
-  image: Image;
+  image: ImageData;
   onClose: () => void;
   onDownload: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onFullView: () => void;
 }
 
@@ -39,11 +41,13 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, onClose, onDownload, onD
         <div className="flex flex-col md:flex-row">
           {/* Image Section */}
           <div className="md:w-1/2 flex justify-center items-center p-4">
-            <img
-              src={image.image_url}
-              alt={image.filename}
-              className="w-full h-auto object-contain rounded-lg"
-            />
+          <Image
+            src={image.image_url}
+            alt={image.filename}
+            width={image.width}
+            height={image.height}
+            className="rounded-lg"
+          />
           </div>
 
           {/* Details Section */}
@@ -68,15 +72,17 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, onClose, onDownload, onD
               >
                 Download
               </button>
-              <button
-                onClick={() => {
-                  onDelete();
-                  onClose();
-                }}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200"
-              >
-                Delete
-              </button>
+              {onDelete && (
+                <button
+                  onClick={() => {
+                    onDelete();
+                    onClose();
+                  }}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200"
+                >
+                  Delete
+                </button>
+              )}
               <button
                 onClick={onFullView}
                 className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200"

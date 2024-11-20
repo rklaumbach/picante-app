@@ -11,13 +11,15 @@ import ImageModal from '../../components/ImageModal';
 import { useRouter } from 'next/navigation';
 import Button from '../../components/Button';
 import { toast } from 'react-toastify'; // Import toast for notifications
-import { Image } from '@/types/types'; // Import the unified Image interface
+import { ImageData } from '@/types/types'; // Import the unified Image interface
+import Image from 'next/image';
+
 
 const GalleryPage: React.FC = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [images, setImages] = useState<Image[]>([]);
-  const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+  const [images, setImages] = useState<ImageData[]>([]);
+  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -55,7 +57,7 @@ const GalleryPage: React.FC = () => {
     fetchImages();
   }, [status, router]);
 
-  const handleImageClick = (image: Image) => {
+  const handleImageClick = (image: ImageData) => {
     setSelectedImage(image);
   };
 
@@ -91,7 +93,7 @@ const GalleryPage: React.FC = () => {
   }, [imageToDelete, images]);
 
   // Function to handle image download
-  const handleDownload = useCallback(async (image: Image) => {
+  const handleDownload = useCallback(async (image: ImageData) => {
     try {
       // Fetch the image as a blob
       const response = await fetch(image.image_url, {
@@ -125,7 +127,7 @@ const GalleryPage: React.FC = () => {
   }, []);
 
   // Function to handle full view
-  const handleFullView = useCallback((image: Image) => {
+  const handleFullView = useCallback((image: ImageData) => {
     // Open the full view in a new tab and pass the image data via sessionStorage
     window.open(image.image_url, '_blank');
   }, []);
@@ -159,18 +161,21 @@ const GalleryPage: React.FC = () => {
             {images.length === 0 ? (
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {images.map((image) => (
                   <div
                     key={image.id}
                     className="relative group cursor-pointer overflow-hidden"
                     onClick={() => handleImageClick(image)}
                   >
-                    <img
+                    <Image
                       src={image.image_url}
                       alt={image.filename}
+                      width={image.width}
+                      height={image.height}
+                      layout="responsive"
                       loading="lazy"
-                      className="w-full h-auto rounded-lg object-cover transform transition-transform duration-200 hover:scale-105"
+                      className="rounded-lg transform transition-transform duration-200 hover:scale-105"
                     />
                     <button
                       className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
