@@ -74,7 +74,7 @@ fastapi_app = FastAPI(title="Image Processing API")
 class Txt2ImgRequest(BaseModel):
     user_id: str  # Added user_id
     steps: str = 'all'
-    upscale: bool = True
+    upscale_enabled: bool = True
     image_prompt: str
     face_prompt: str = "highly detailed face, 8k resolution"
     negative_prompt: str = (
@@ -92,7 +92,7 @@ class Txt2ImgRequest(BaseModel):
         "no_sclera, mismatched_sclera, cross_eyed, no_mouth, "
     )
     res: str = '1024x1024'
-    upscale_factor: str = '2x'
+    scaling: int = 2
 
 class Img2ImgResponse(BaseModel):
     job_id: str
@@ -233,7 +233,7 @@ async def generate_txt2img(request: Txt2ImgRequest):
         'job_id': job_id,
         'user_id': request.user_id,  # Include user_id
         'steps': request.steps,
-        'upscale': request.upscale,
+        'upscale_enabled': request.upscale_enabled,
         'timestamp': timestamp,  # Actual timestamp
         'image_prompt': request.image_prompt,
         'negative_prompt': request.negative_prompt,
@@ -241,7 +241,8 @@ async def generate_txt2img(request: Txt2ImgRequest):
         'face_negative_prompt': request.face_negative_prompt,
         'height': height,
         'width': width,
-        'device': 'cuda'  # Or make this configurable
+        'device': 'cuda',  # Or make this configurable
+        'scaling': request.scaling
     }
     
     # Enqueue the Modal Function
@@ -261,7 +262,7 @@ async def generate_txt2img(request: Txt2ImgRequest):
 async def generate_img2img(
     user_id: str = Form(...),  # Added user_id as a required Form field
     steps: str = Form('all'),
-    upscale: bool = Form(True),
+    upscale_enabled: bool = Form(True),
     image_prompt: str = Form(...),
     face_prompt: str = Form("highly detailed face, 8k resolution"),
     negative_prompt: str = Form(
@@ -313,7 +314,7 @@ async def generate_img2img(
         'job_id': job_id,
         'user_id': user_id,  # Include user_id
         'steps': steps,
-        'upscale': upscale,
+        'upscale_enabled': upscale_enabled,
         'timestamp': timestamp,  # Actual timestamp
         'image_prompt': image_prompt,
         'negative_prompt': negative_prompt,
@@ -372,14 +373,15 @@ def process_txt2img(job: Dict):
         workflow = Txt2ImgFaceDetailUpscaleWorkflow(
             device=job.get('device', 'cuda'),
             steps=job.get('steps', 'all'),
-            upscale=job.get('upscale', True),
+            upscale_enabled=job.get('upscale_enabled', True),
             timestamp=job.get('timestamp'),
             image_prompt=job.get('image_prompt', ""),
             negative_prompt=job.get('negative_prompt'),
             face_prompt=job.get('face_prompt', ""),
             face_negative_prompt=job.get('face_negative_prompt', ""),
             height=job.get('height', 1024),
-            width=job.get('width', 1024)
+            width=job.get('width', 1024),
+            scaling=job.get('scaling')
         )
         
         images_dict = workflow.run()
@@ -464,7 +466,7 @@ def process_img2img(job: Dict):
             input_image_path=job.get('input_image_path'),
             device=job.get('device', 'cuda'),
             steps=job.get('steps', 'all'),
-            upscale=job.get('upscale', True),
+            upscale_enabled=job.get('upscale_enabled', True),
             timestamp=job.get('timestamp'),
             image_prompt=job.get('image_prompt', ""),
             negative_prompt=job.get('negative_prompt'),

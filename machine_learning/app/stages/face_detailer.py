@@ -299,9 +299,9 @@ class FaceDetailer:
                         image=face_region_high_res,
                         mask_image=face_mask_high_res,
                         control_image=control_image_high_res,
-                        num_inference_steps=30,
+                        num_inference_steps=60,
                         guidance_scale=7.5,
-                        strength=0.5,
+                        strength=0.4,
                         height=high_res_size[1],
                         width=high_res_size[0]
                     )

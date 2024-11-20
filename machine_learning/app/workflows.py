@@ -22,21 +22,22 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         self,
         device='cuda',
         steps='all',
-        upscale=True,
+        upscale_enabled=True,
         timestamp=None,
         image_prompt="",
         negative_prompt=None,
         face_prompt="",
         face_negative_prompt=None,
         height=1024,
-        width=1024
+        width=1024,
+        scaling=2
     ):
         """
         Initialize the Txt2ImgFaceDetailUpscaleWorkflow.
         """
         self.device = device
         self.steps = [step.strip().lower() for step in steps.split(',')]
-        self.upscale_enabled = upscale
+        self.upscale_enabled = upscale_enabled
         self.timestamp = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
         self.image_prompt = image_prompt
         self.negative_prompt = negative_prompt
@@ -44,6 +45,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         self.face_negative_prompt = face_negative_prompt
         self.height = height
         self.width = width
+        self.scaling = scaling
 
     def should_run_step(self, selected_steps):
         """
@@ -131,7 +133,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                     logger.error("No image available for upscaling. Exiting workflow.")
                     return None
 
-                upscaler = RealESRGAN(scale=2)
+                upscaler = RealESRGAN(scale=self.scaling)
                 upscaled_image = upscaler.upscale(upscaling_input_image)
                 if upscaled_image is None:
                     logger.error("Upscaling failed. Exiting workflow.")
@@ -168,7 +170,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         input_image_path,
         device='cuda',
         steps='all',
-        upscale=True,
+        upscale_enabled=True,
         timestamp=None,
         image_prompt="",
         negative_prompt=None,
@@ -176,7 +178,8 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         face_negative_prompt=None,
         height=1024,
         width=1024,
-        strength=0.7  # Default strength for img2img
+        strength=0.7,
+        scaling=2
     ):
         """
         Initialize the Img2ImgFaceDetailUpscaleWorkflow.
@@ -184,7 +187,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         self.input_image_path = input_image_path
         self.device = device
         self.steps = [step.strip().lower() for step in steps.split(',')]
-        self.upscale_enabled = upscale
+        self.upscale_enabled = upscale_enabled
         self.timestamp = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
         self.image_prompt = image_prompt
         self.negative_prompt = negative_prompt
@@ -193,6 +196,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         self.height = height
         self.width = width
         self.strength = strength
+        self.scaling = scaling
 
     def should_run_step(self, selected_steps):
         """
@@ -302,7 +306,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                     logger.error("No image available for upscaling. Exiting workflow.")
                     return None
 
-                upscaler = RealESRGAN(scale=2)
+                upscaler = RealESRGAN(scale=self.scaling)
                 upscaled_image = upscaler.upscale(upscaling_input_image)
                 if upscaled_image is None:
                     logger.error("Upscaling failed. Exiting workflow.")
