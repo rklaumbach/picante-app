@@ -110,6 +110,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
 
   return (
     <div className="w-full mb-6">
+      <Label className="block text-xl font-bold text-gray-700 mb-3">{label}:</Label>
       {/* Display Selected Tags as Removable Chips */}
       <div className="flex flex-wrap mt-6 gap-4">
         {selectedTags.map((selectedTag, index) => (
@@ -153,8 +154,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
       </div>
 
       {/* Combobox for Tag Autocomplete */}
-      <Combobox onChange={handleSelection} nullable>
-        <Label className="block text-xl font-bold text-gray-700 mb-3">{label}:</Label>
+      <Combobox onChange={handleSelection}>
         <div className="relative">
           <ComboboxInput
             ref={inputRef}
