@@ -112,11 +112,11 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({ label, selectedTags, 
     <div className="w-full mb-6">
       <label className="block text-xl font-bold text-gray-700 mb-3">{label}:</label>
       {/* Display Selected Tags as Removable Chips */}
-      <div className="flex flex-wrap mt-6 gap-4">
+      <div className="flex flex-wrap mt-4 mb-4 gap-4">
         {selectedTags.map((selectedTag, index) => (
           <div
             key={`${selectedTag.tag}-${index}`}
-            className="flex items-center bg-blue-200 text-blue-900 px-3 py-1 rounded-full text-2xl"
+            className="flex items-center bg-blue-200 text-blue-900 px-2 py-1 rounded-full text-2xl"
           >
             {/* Decrease Weight Button */}
             <button
