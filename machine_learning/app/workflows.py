@@ -3,13 +3,10 @@
 import torch
 import logging
 from datetime import datetime
-import os
 import warnings
 import gc
 from stages.image_generator import ImageGenerator
-from stages.hand_detailer import HandDetailer
 from stages.face_detailer import FaceDetailer
-from stages.face_enhance import GFPGANEnhancer
 from stages.upscaler import RealESRGAN
 from PIL import Image
 
@@ -32,7 +29,9 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         face_negative_prompt=None,
         height=1024,
         width=1024,
-        scaling=2
+        scaling=2,
+        txt2img_pipeline=None,       # New parameter
+        face_detailer_pipeline=None  # New parameter
     ):
         """
         Initialize the Txt2ImgFaceDetailUpscaleWorkflow.
@@ -48,6 +47,10 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         self.height = height
         self.width = width
         self.scaling = scaling
+
+        # Store the pre-initialized pipelines
+        self.txt2img_pipeline = txt2img_pipeline
+        self.face_detailer_pipeline = face_detailer_pipeline
 
     def should_run_step(self, selected_steps):
         """
@@ -65,7 +68,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                 image_generator = ImageGenerator(
                     device=self.device,
                     height=self.height,
-                    width=self.width
+                    width=self.width,
+                    pipeline=self.txt2img_pipeline  # Pass the pre-initialized pipeline
                 )
                 generated_image = image_generator.generate_image(
                     self.image_prompt,
@@ -77,16 +81,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
                 images['final_image'] = generated_image
 
-                # Unload the txt2img pipeline to free up GPU memory
-                if hasattr(image_generator, 'pipe') and image_generator.pipe is not None:
-                    del image_generator.pipe
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-                # Delete the image_generator instance
-                del image_generator
-                torch.cuda.empty_cache()
-                gc.collect()
+                # No need to unload the pipeline or delete the instance
+                # The pipeline is reused, and memory cleanup is handled elsewhere
 
             # Step 2: Face Enhancement
             if self.should_run_step(['all', 'face_fix']):
@@ -100,7 +96,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
                     device=self.device,
                     height=self.height,
                     width=self.width,
-                    timestamp=self.timestamp
+                    timestamp=self.timestamp,
+                    pipeline=self.face_detailer_pipeline  # Pass the pre-initialized pipeline
                 )
                 face_results = face_detailer.enhance_faces(
                     face_input_image,
@@ -113,16 +110,7 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
                 images['final_image'] = face_results.get('enhanced_face', face_input_image)
 
-                # Unload the face_detailer pipeline
-                if hasattr(face_detailer, 'pipe') and face_detailer.pipe is not None:
-                    del face_detailer.pipe
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-                # Delete the face_detailer instance
-                del face_detailer
-                torch.cuda.empty_cache()
-                gc.collect()
+                # No need to unload the pipeline or delete the instance
 
             # Step 3: Upscaling
             if self.upscale_enabled and self.should_run_step(['all', 'upscale']):
@@ -140,13 +128,8 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
                 images['final_image'] = upscaled_image
 
-                # Unload the upscaler pipeline
-                if hasattr(upscaler, 'pipe') and upscaler.pipe is not None:
-                    del upscaler.pipe
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-                # Delete the upscaler instance
+                # Unload the upscaler if necessary
+                # Since upscaler is not reused, we can delete it
                 del upscaler
                 torch.cuda.empty_cache()
                 gc.collect()
@@ -178,7 +161,9 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         height=1024,
         width=1024,
         strength=0.7,
-        scaling=2
+        scaling=2,
+        img2img_pipeline=None,        # New parameter
+        face_detailer_pipeline=None   # New parameter
     ):
         """
         Initialize the Img2ImgFaceDetailUpscaleWorkflow.
@@ -196,6 +181,10 @@ class Img2ImgFaceDetailUpscaleWorkflow:
         self.width = width
         self.strength = strength
         self.scaling = scaling
+
+        # Store the pre-initialized pipelines
+        self.img2img_pipeline = img2img_pipeline
+        self.face_detailer_pipeline = face_detailer_pipeline
 
     def should_run_step(self, selected_steps):
         """
@@ -227,7 +216,8 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                 image_generator = ImageGenerator(
                     device=self.device,
                     height=self.height,
-                    width=self.width
+                    width=self.width,
+                    pipeline=self.img2img_pipeline  # Pass the pre-initialized pipeline
                 )
                 generated_image = image_generator.generate_image(
                     image_prompt=self.image_prompt,
@@ -243,16 +233,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
 
                 images['final_image'] = generated_image
 
-                # Unload the img2img pipeline to free up GPU memory
-                if hasattr(image_generator, 'pipe') and image_generator.pipe is not None:
-                    del image_generator.pipe
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-                # Delete the image_generator instance
-                del image_generator
-                torch.cuda.empty_cache()
-                gc.collect()
+                # No need to unload the pipeline or delete the instance
 
             # Step 2: Face Enhancement
             if self.should_run_step(['all', 'face_fix']):
@@ -266,7 +247,8 @@ class Img2ImgFaceDetailUpscaleWorkflow:
                     device=self.device,
                     height=self.height,
                     width=self.width,
-                    timestamp=self.timestamp
+                    timestamp=self.timestamp,
+                    pipeline=self.face_detailer_pipeline  # Pass the pre-initialized pipeline
                 )
                 face_results = face_detailer.enhance_faces(
                     face_input_image,
@@ -279,16 +261,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
 
                 images['final_image'] = face_results.get('enhanced_face', face_input_image)
 
-                # Unload the face_detailer pipeline
-                if hasattr(face_detailer, 'pipe') and face_detailer.pipe is not None:
-                    del face_detailer.pipe
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-                # Delete the face_detailer instance
-                del face_detailer
-                torch.cuda.empty_cache()
-                gc.collect()
+                # No need to unload the pipeline or delete the instance
 
             # Step 3: Upscaling
             if self.upscale_enabled and self.should_run_step(['all', 'upscale']):
@@ -306,13 +279,7 @@ class Img2ImgFaceDetailUpscaleWorkflow:
 
                 images['final_image'] = upscaled_image
 
-                # Unload the upscaler pipeline
-                if hasattr(upscaler, 'pipe') and upscaler.pipe is not None:
-                    del upscaler.pipe
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-                # Delete the upscaler instance
+                # Unload the upscaler if necessary
                 del upscaler
                 torch.cuda.empty_cache()
                 gc.collect()

@@ -1,7 +1,7 @@
 # app/requirements.txt
 
-torch==2.5.0
-torchvision==0.20
+torch==2.5.1
+torchvision==0.20.1
 basicsr @ git+https://github.com/xinntao/BasicSR.git@8d56e3a045f9fb3e1d8872f92ee4a4f07f886b0a
 gfpgan==1.3.8
 ultralytics==8.3.1
@@ -19,4 +19,3 @@ accelerate
 safetensors
 #google-cloud-storage
 supabase
-sd_embed @ git+https://github.com/xhinker/sd_embed.git@main

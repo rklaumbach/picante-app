@@ -3,6 +3,9 @@ from torch import autocast
 from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline
 import gc
 import logging
+from unlimited_prompt_optimization import get_weighted_text_embeddings_sdxl
+
+
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -15,12 +18,15 @@ def truncate_prompt(prompt, tokenizer, max_length=77):
 
 # Image Generator Class
 class ImageGenerator:
-    def __init__(self, device='cuda', height=1024, width=1024):
+    def __init__(self, device='cuda', height=1024, width=1024, pipeline=None):
         self.device = device
         self.height = height
         self.width = width
         self.tokenizer = None
-        self.pipe = None  # Add a pipe attribute to store the pipeline instance
+        self.pipe = pipeline  # Accept pre-initialized pipeline
+
+        if self.pipe is None:
+            self.initialize_pipeline()
 
     def initialize_pipeline(self, pipeline_type='txt2img'):
         if self.pipe is not None:
@@ -81,25 +87,27 @@ class ImageGenerator:
             else:
                 pipeline_type = 'img2img'
 
-            logger.info(f"Initializing {pipeline_type} pipeline.")
-            pipe = self.initialize_pipeline(pipeline_type)
+            logger.info(f"Using {pipeline_type} pipeline.")
+            pipe = self.pipe
 
-            # Truncate the image prompt if necessary
-            if self.tokenizer:
-                image_prompt = truncate_prompt(image_prompt, self.tokenizer)
-            else:
-                logger.warning("Tokenizer not found. Skipping prompt truncation for image_prompt.")
-
-            # Truncate the negative prompt if necessary
-            if negative_prompt and self.tokenizer:
-                negative_prompt = truncate_prompt(negative_prompt, self.tokenizer)
-            elif negative_prompt:
-                logger.warning("Tokenizer not found. Skipping prompt truncation for negative_prompt.")
+            # Generate weighted text embeddings using sd_embed
+            (
+                prompt_embeds,
+                negative_prompt_embeds,
+                pooled_prompt_embeds,
+                negative_pooled_prompt_embeds,
+            ) = get_weighted_text_embeddings_sdxl(
+                pipe,
+                prompt=image_prompt,
+                neg_prompt=negative_prompt,
+            )
 
             # Prepare pipeline inputs
             pipeline_kwargs = {
-                "prompt": image_prompt,
-                "negative_prompt": negative_prompt,
+                "prompt_embeds": prompt_embeds,
+                "negative_prompt_embeds": negative_prompt_embeds,
+                "pooled_prompt_embeds": pooled_prompt_embeds,
+                "negative_pooled_prompt_embeds": negative_pooled_prompt_embeds,
                 "num_inference_steps": num_inference_steps,
                 "guidance_scale": guidance_scale,
                 "height": self.height,
@@ -118,6 +126,11 @@ class ImageGenerator:
                     result = pipe(**pipeline_kwargs)
 
             generated_image = result.images[0]
+
+            # Clean up to free memory
+            del prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
+            torch.cuda.empty_cache()
+            gc.collect()
 
             logger.info("Image generation completed.")
 

@@ -15,6 +15,8 @@ from PIL import Image, ImageDraw, ImageFilter
 import cv2
 from torch import autocast
 from ultralytics import YOLO
+from unlimited_prompt_optimization import get_weighted_text_embeddings_sdxl
+
 
 def truncate_prompt(prompt, tokenizer, max_length=77):
     """Truncate the prompt by token count without decoding."""
@@ -39,7 +41,8 @@ class FaceDetailer:
         height=1024,
         width=1024,
         padding_ratio=0.2,
-        timestamp=None
+        timestamp=None,
+        pipeline=None
     ):
         """
         Initialize the FaceDetailer using MediaPipe Face Mesh, ControlNet, and inpainting.
@@ -50,7 +53,8 @@ class FaceDetailer:
         self.width = width
         self.padding_ratio = padding_ratio
         self.timestamp = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+        self.pipe = pipeline  # Accept pre-initialized pipeline
+
         # Initialize YOLO with fixed model path
         try:
             self.yolo = YOLO("/app/models/face_yolov8m.pt").to(self.device)
@@ -60,26 +64,24 @@ class FaceDetailer:
             raise
 
         # Initialize MediaPipe Face Mesh
-        self.face_mesh = face_mesh = mp.solutions.face_mesh.FaceMesh(
+        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             static_image_mode=True,
             max_num_faces=5,
             refine_landmarks=True,
             min_detection_confidence=0.7
         )
-
-
         logger.info("Face Mesh Loaded Successfully")
 
         self.tokenizer = None  # Will be set when initializing the pipeline
-                    # Initialize the inpainting pipeline
-        self.pipe = self.initialize_pipeline()
+
+        if self.pipe is None:
+            self.initialize_pipeline()
 
     def initialize_pipeline(self):
         """
         Initialize the inpainting pipeline using ControlNet compatible with SDXL.
         """
         try:
-
             controlnet_model_path="/app/models/controlnet/openpose"
 
             # Load SDXL-compatible ControlNet model from local files
@@ -93,7 +95,7 @@ class FaceDetailer:
             model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
 
             # Load the pipeline
-            pipe = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
+            self.pipe = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
                 model_file,
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
@@ -101,65 +103,16 @@ class FaceDetailer:
                 use_safetensors=True,
             ).to(self.device)
 
-            pipe.enable_xformers_memory_efficient_attention()
-            self.tokenizer = pipe.tokenizer
+            self.pipe.enable_xformers_memory_efficient_attention()
+            self.tokenizer = self.pipe.tokenizer
 
             # Clean up
             torch.cuda.empty_cache()
             gc.collect()
 
             logger.info("Inpaint pipeline with ControlNet initialized successfully using the face detailing model.")
-            return pipe
         except Exception as e:
             logger.error(f"Error initializing inpaint pipeline: {e}")
-            raise
-
-    def match_skin_tones(self, source_image, target_image, mask):
-        """
-        Adjust the color distribution of the target image's skin region to match that of the source image.
-
-        Args:
-            source_image (PIL.Image.Image): Original image.
-            target_image (PIL.Image.Image): Inpainted image.
-            mask (PIL.Image.Image): Mask used for inpainting.
-
-        Returns:
-            PIL.Image.Image: Color-matched image.
-        """
-        try:
-            # Convert images to NumPy arrays
-            source_np = np.array(source_image).astype(np.float32)
-            target_np = np.array(target_image).astype(np.float32)
-            mask_np = np.array(mask.convert('L')).astype(bool)  # Ensure mask is single channel and boolean
-
-            # Initialize an empty array for the matched skin
-            matched_target_np = target_np.copy()
-
-            # Perform histogram matching for each channel separately within the masked region
-            for channel in range(3):  # Assuming RGB
-                # Extract the source and target skin regions for the current channel
-                source_skin = source_np[:, :, channel][mask_np]
-                target_skin = target_np[:, :, channel][mask_np]
-
-                if len(source_skin) == 0 or len(target_skin) == 0:
-                    logger.warning(f"No skin pixels found in channel {channel} for histogram matching.")
-                    continue
-
-                # Perform histogram matching on the masked regions
-                matched_channel = match_histograms(target_np[:, :, channel], source_np[:, :, channel], channel_axis=None)
-
-                # Replace only the masked regions in the target image
-                matched_target_np[:, :, channel][mask_np] = matched_channel[mask_np]
-
-            # Clip values to valid range and convert back to uint8
-            matched_target_np = np.clip(matched_target_np, 0, 255).astype(np.uint8)
-
-            # Convert back to PIL Image
-            matched_target_image = Image.fromarray(matched_target_np, 'RGB')
-            return matched_target_image
-
-        except Exception as e:
-            logger.error(f"Error matching skin tones: {e}")
             raise
 
     def enhance_faces(
@@ -173,17 +126,17 @@ class FaceDetailer:
                 logger.error("No image provided to enhance_faces.")
                 return None
 
-            # Truncate the face prompt if necessary
-            if self.tokenizer:
-                face_prompt = truncate_prompt(face_prompt, self.tokenizer)
-            else:
-                logger.warning("Tokenizer not found. Skipping prompt truncation for face_prompt.")
-
-            # Truncate the negative prompt if necessary
-            if face_negative_prompt and self.tokenizer:
-                face_negative_prompt = truncate_prompt(face_negative_prompt, self.tokenizer)
-            elif face_negative_prompt:
-                logger.warning("Tokenizer not found. Skipping prompt truncation for negative_prompt.")
+            # Generate weighted text embeddings using sd_embed
+            (
+                face_prompt_embeds,
+                face_negative_prompt_embeds,
+                face_pooled_prompt_embeds,
+                face_negative_pooled_prompt_embeds,
+            ) = get_weighted_text_embeddings_sdxl(
+                self.pipe,
+                prompt=face_prompt,
+                neg_prompt=face_negative_prompt,
+            )
 
             # Convert PIL Image to RGB and NumPy array
             img_rgb = image.convert("RGB")
@@ -199,7 +152,6 @@ class FaceDetailer:
             if not face_detections:
                 logger.info("No faces detected by YOLO.")
                 # Clean up resources
-                del self.pipe
                 torch.cuda.empty_cache()
                 gc.collect()
                 return {'enhanced_face': image, 'debug_images': {}}
@@ -289,11 +241,13 @@ class FaceDetailer:
                 debug_images[f'face_{idx}_high_res_mask'] = face_mask_high_res
                 debug_images[f'face_{idx}_high_res_control'] = control_image_high_res
 
-                # Inpaint the high-resolution face
+                # Inpaint the high-resolution face using embeddings
                 with autocast(self.device):
                     result = self.pipe(
-                        prompt=face_prompt,
-                        negative_prompt=face_negative_prompt,
+                        prompt_embeds=face_prompt_embeds,
+                        negative_prompt_embeds=face_negative_prompt_embeds,
+                        pooled_prompt_embeds=face_pooled_prompt_embeds,
+                        negative_pooled_prompt_embeds=face_negative_pooled_prompt_embeds,
                         image=face_region_high_res,
                         mask_image=face_mask_high_res,
                         control_image=control_image_high_res,
@@ -313,17 +267,15 @@ class FaceDetailer:
                 # Paste the enhanced face back into the original image
                 final_image.paste(enhanced_face, (x1_padded, y1_padded), face_mask)
 
-            # Clean up resources
-            del self.pipe
+            # Clean up embeddings and memory
+            del face_prompt_embeds, face_negative_prompt_embeds, face_pooled_prompt_embeds, face_negative_pooled_prompt_embeds
             torch.cuda.empty_cache()
             gc.collect()
 
             return {'enhanced_face': final_image, 'debug_images': debug_images}
         except Exception as e:
             logger.exception("Error enhancing faces:")
-        raise
-
-
+            raise
 
     def create_precise_mask_with_landmarks(self, image, face_landmarks):
         """

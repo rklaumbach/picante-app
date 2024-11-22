@@ -14,8 +14,9 @@ import logging
 import json
 from supabase import create_client, Client
 from datetime import datetime, timezone
-
+from diffusers import ControlNetModel, StableDiffusionXLPipeline, StableDiffusionXLControlNetInpaintPipeline
 from workflows import Txt2ImgFaceDetailUpscaleWorkflow, Img2ImgFaceDetailUpscaleWorkflow
+import torch
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -356,6 +357,54 @@ def process_txt2img(job: Dict):
     """
     Modal Function to process Txt2Img image generation jobs.
     """
+
+    try:
+        global txt2img_pipeline, face_detailer_pipeline
+
+        # Initialize txt2img_pipeline if not already done
+        if 'txt2img_pipeline' not in globals() or txt2img_pipeline is None:
+            model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+
+            txt2img_pipeline = StableDiffusionXLPipeline.from_single_file(
+                model_file,
+                torch_dtype=torch.float16,
+                variant="fp16",
+                use_safetensors=True,
+            ).to('cuda')
+
+            # Set Clip Skip if applicable
+            if hasattr(txt2img_pipeline.text_encoder, 'config') and hasattr(txt2img_pipeline.text_encoder.config, 'clip_skip'):
+                txt2img_pipeline.text_encoder.config.clip_skip = 2
+            if hasattr(txt2img_pipeline.text_encoder_2, 'config') and hasattr(txt2img_pipeline.text_encoder_2.config, 'clip_skip'):
+                txt2img_pipeline.text_encoder_2.config.clip_skip = 2
+
+            txt2img_pipeline.enable_xformers_memory_efficient_attention()
+
+        # Initialize face_detailer_pipeline if not already done
+        if 'face_detailer_pipeline' not in globals() or face_detailer_pipeline is None:
+            controlnet_model_path = "/app/models/controlnet/openpose"
+
+            # Load ControlNet model
+            controlnet = ControlNetModel.from_pretrained(
+                controlnet_model_path,
+                torch_dtype=torch.float16,
+                use_safetensors=False  # Assuming .safetensors files
+            ).to('cuda')
+
+            model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+
+            face_detailer_pipeline = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
+                model_file,
+                controlnet=controlnet,
+                torch_dtype=torch.float16,
+                variant="fp16",
+                use_safetensors=True,
+            ).to('cuda')
+
+            face_detailer_pipeline.enable_xformers_memory_efficient_attention()
+    except Exception as e:
+        logger.exception("Failed to initialize pipelines")
+
     try:
         supabase_admin = get_supabase_client()
         workflow = Txt2ImgFaceDetailUpscaleWorkflow(
@@ -369,7 +418,9 @@ def process_txt2img(job: Dict):
             face_negative_prompt=job.get('face_negative_prompt', ""),
             height=job.get('height', 1024),
             width=job.get('width', 1024),
-            scaling=job.get('scaling')
+            scaling=job.get('scaling'),
+            txt2img_pipeline=txt2img_pipeline,
+            face_detailer_pipeline=face_detailer_pipeline
         )
 
         logger.info(f"Scaling in process_txt2img = {job.get('scaling')}")
