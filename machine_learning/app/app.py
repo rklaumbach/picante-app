@@ -45,6 +45,11 @@ image = image.run_commands(
     "pip3 install -U xformers --index-url https://download.pytorch.org/whl/cu124"
 )
 
+image = image.run_commands(
+    'python -c "from transformers import utils; utils.move_cache()" || echo "Transformers cache migration skipped."'
+    ' && python -c "from ultralytics import YOLO; YOLO.create_settings_file()" || echo "Ultralytics Settings file already exists."'
+)
+
 # Consolidate all file copies into a single step by copying the entire 'app/' directory
 image = image.copy_local_dir(
     local_path="app",
@@ -69,6 +74,34 @@ job_results = ModalDict.from_name("job-results", create_if_missing=True)
 
 # Initialize FastAPI
 fastapi_app = FastAPI(title="Image Processing API")
+
+# ------------------------ One-Time Operations ------------------------
+
+# # One-time Transformer cache migration
+# from transformers import cache_utils
+
+# def migrate_transformers_cache():
+#     try:
+#         cache_utils.move_cache()
+#         logger.info("Transformers cache migrated successfully.")
+#     except Exception as e:
+#         logger.warning("Transformers cache migration skipped or already migrated.")
+
+# # One-time Ultralytics config creation
+# from ultralytics import YOLO
+
+# def create_ultralytics_config():
+#     try:
+#         YOLO.create_settings_file()
+#         logger.info("Ultralytics Settings file created successfully.")
+#     except Exception as e:
+#         logger.warning("Ultralytics Settings file already exists.")
+
+# # Execute one-time operations
+# migrate_transformers_cache()
+# create_ultralytics_config()
+
+# -----------------------------------------------------------------------
 
 # Define Pydantic Models
 class Txt2ImgRequest(BaseModel):

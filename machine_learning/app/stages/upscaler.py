@@ -510,7 +510,7 @@ class RealESRGAN:
         self.model.to(self.device)
         print(f"Weights loaded from: {model_path}")
 
-    @torch.cuda.amp.autocast()
+    @torch.amp.autocast('cuda')
     def upscale(self, lr_image, batch_size=4, patches_size=192,
                 padding=24, pad_size=15):
         """

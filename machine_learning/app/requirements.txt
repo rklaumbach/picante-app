@@ -19,3 +19,4 @@ accelerate
 safetensors
 #google-cloud-storage
 supabase
+sd_embed @ git+https://github.com/xhinker/sd_embed.git@main

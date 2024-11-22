@@ -60,27 +60,33 @@ class FaceDetailer:
             raise
 
         # Initialize MediaPipe Face Mesh
-        self.mp_face_mesh = mp.solutions.face_mesh
-        self.face_mesh = self.mp_face_mesh.FaceMesh(
+        self.face_mesh = face_mesh = mp.solutions.face_mesh.FaceMesh(
             static_image_mode=True,
             max_num_faces=5,
             refine_landmarks=True,
             min_detection_confidence=0.7
         )
 
+
+        logger.info("Face Mesh Loaded Successfully")
+
         self.tokenizer = None  # Will be set when initializing the pipeline
-        self.pipe = None
+                    # Initialize the inpainting pipeline
+        self.pipe = self.initialize_pipeline()
 
     def initialize_pipeline(self):
         """
         Initialize the inpainting pipeline using ControlNet compatible with SDXL.
         """
         try:
-            # Load SDXL-compatible ControlNet model
+
+            controlnet_model_path="/app/models/controlnet/openpose"
+
+            # Load SDXL-compatible ControlNet model from local files
             controlnet = ControlNetModel.from_pretrained(
-                "thibaud/controlnet-openpose-sdxl-1.0",
+                controlnet_model_path,
                 torch_dtype=torch.float16,
-                use_safetensors=False
+                use_safetensors=False  # Assuming you have .safetensors files
             ).to(self.device)
 
             # Load the face detailing model components
@@ -165,14 +171,6 @@ class FaceDetailer:
         try:
             if image is None:
                 logger.error("No image provided to enhance_faces.")
-                return None
-
-            # Initialize the inpainting pipeline
-            self.pipe = self.initialize_pipeline()
-
-            # Check if pipeline is initialized
-            if self.pipe is None:
-                logger.error("Pipeline is None after initialization.")
                 return None
 
             # Truncate the face prompt if necessary
