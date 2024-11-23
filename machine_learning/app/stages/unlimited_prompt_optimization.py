@@ -2,7 +2,8 @@
 
 import re
 import torch
-from diffusers import StableDiffusionXLPipeline, CLIPTokenizer
+from diffusers import StableDiffusionXLPipeline
+from transformers import CLIPTokenizer
 
 def parse_prompt_attention(text):
     """

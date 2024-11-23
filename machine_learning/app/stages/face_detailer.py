@@ -135,16 +135,16 @@ class FaceDetailer:
                 return None
 
             # Generate weighted text embeddings using sd_embed
-            (
-                face_prompt_embeds,
-                face_negative_prompt_embeds,
-                face_pooled_prompt_embeds,
-                face_negative_pooled_prompt_embeds,
-            ) = get_weighted_text_embeddings_sdxl(
-                self.pipe,
-                prompt=face_prompt,
-                neg_prompt=face_negative_prompt,
-            )
+            # (
+            #     face_prompt_embeds,
+            #     face_negative_prompt_embeds,
+            #     face_pooled_prompt_embeds,
+            #     face_negative_pooled_prompt_embeds,
+            # ) = get_weighted_text_embeddings_sdxl(
+            #     self.pipe,
+            #     prompt=face_prompt,
+            #     neg_prompt=face_negative_prompt,
+            # )
 
             # Convert PIL Image to RGB and NumPy array
             img_rgb = image.convert("RGB")
@@ -254,10 +254,8 @@ class FaceDetailer:
                     # Inpaint the high-resolution face using embeddings
                     with torch.no_grad(), autocast(self.device):
                         result = self.pipe(
-                            prompt_embeds=face_prompt_embeds,
-                            negative_prompt_embeds=face_negative_prompt_embeds,
-                            pooled_prompt_embeds=face_pooled_prompt_embeds,
-                            negative_pooled_prompt_embeds=face_negative_pooled_prompt_embeds,
+                            prompt=face_prompt,
+                            negative_prompt=face_negative_prompt,
                             image=face_region_high_res,
                             mask_image=face_mask_high_res,
                             control_image=control_image_high_res,
