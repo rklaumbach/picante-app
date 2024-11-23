@@ -11,6 +11,7 @@ from PIL import Image
 import numpy as np
 import cv2
 import logging
+import gc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -551,6 +552,11 @@ class RealESRGAN:
             np_sr_image, padded_image_shape=padded_size_scaled, 
             target_shape=scaled_image_shape, padding_size=padding * scale
         )
+
+        del img, res, sr_image
+        torch.cuda.empty_cache()
+        gc.collect()
+
         sr_img = (np_sr_image * 255).astype(np.uint8)
         sr_img = unpad_image(sr_img, pad_size * scale)
         sr_img = Image.fromarray(sr_img)

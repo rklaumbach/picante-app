@@ -3,7 +3,7 @@ from torch import autocast
 from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline
 import gc
 import logging
-from unlimited_prompt_optimization import get_weighted_text_embeddings_sdxl
+from .unlimited_prompt_optimization import get_weighted_text_embeddings_sdxl
 
 
 
@@ -122,13 +122,15 @@ class ImageGenerator:
 
             logger.info(f"Generating image using {pipeline_type} pipeline.")
             with torch.inference_mode():
-                with autocast(self.device):
+                with torch.no_grad(), autocast(self.device):
                     result = pipe(**pipeline_kwargs)
 
             generated_image = result.images[0]
 
             # Clean up to free memory
-            del prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
+            del prompt_embeds, negative_prompt_embeds
+            del pooled_prompt_embeds, negative_pooled_prompt_embeds
+            del result
             torch.cuda.empty_cache()
             gc.collect()
 

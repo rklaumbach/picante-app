@@ -83,6 +83,10 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
                 # No need to unload the pipeline or delete the instance
                 # The pipeline is reused, and memory cleanup is handled elsewhere
+                del image_generator
+                torch.cuda.empty_cache()
+                gc.collect()
+
 
             # Step 2: Face Enhancement
             if self.should_run_step(['all', 'face_fix']):
@@ -110,7 +114,9 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
 
                 images['final_image'] = face_results.get('enhanced_face', face_input_image)
 
-                # No need to unload the pipeline or delete the instance
+                del face_detailer, face_results
+                torch.cuda.empty_cache()
+                gc.collect()
 
             # Step 3: Upscaling
             if self.upscale_enabled and self.should_run_step(['all', 'upscale']):

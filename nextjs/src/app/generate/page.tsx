@@ -94,8 +94,8 @@ const GenerateImagePage: React.FC = () => {
 
     try {
       // Prepare prompts by joining tags with commas and weights in "<tag>:<weight>" format
-      const bodyPrompt = bodyTags.map((t) => `${t.tag}:${t.weight}`).join(', ');
-      const facePrompt = faceTags.map((t) => `${t.tag}:${t.weight}`).join(', ');
+      const bodyPrompt = bodyTags.map((t) => `(${t.tag}:${t.weight})`).join(', ');
+      const facePrompt = faceTags.map((t) => `(${t.tag}:${t.weight})`).join(', ');
 
       // Extract user_id from session
       const userId = session?.user?.id;

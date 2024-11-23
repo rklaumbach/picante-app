@@ -15,7 +15,14 @@ from PIL import Image, ImageDraw, ImageFilter
 import cv2
 from torch import autocast
 from ultralytics import YOLO
-from unlimited_prompt_optimization import get_weighted_text_embeddings_sdxl
+from .unlimited_prompt_optimization import get_weighted_text_embeddings_sdxl
+
+def log_gpu_memory(stage=""):
+    allocated = torch.cuda.memory_allocated() / (1024 ** 3)
+    reserved = torch.cuda.memory_reserved() / (1024 ** 3)
+    logger.info(f"GPU Memory Usage {stage}:")
+    logger.info(f"  Allocated: {allocated:.2f} GB")
+    logger.info(f"  Reserved:  {reserved:.2f} GB")
 
 
 def truncate_prompt(prompt, tokenizer, max_length=77):
@@ -121,6 +128,7 @@ class FaceDetailer:
         face_prompt="A highly detailed portrait of a person with clear facial features, 8k resolution",
         face_negative_prompt="score_4, score_5, score_6, raw, open_mouth, split_mouth, (child)1.5, facial_mark, cartoonized, cartoon, lowres, sketch, painting(medium), extra_teeth, missing_tooth, missing_tooth, deformed, double_chin, mismatched_irises, extra_pupils, no_pupils, mismatched_pupils, no_sclera, mismatched_sclera"
     ):
+        log_gpu_memory("before face enhancement")
         try:
             if image is None:
                 logger.error("No image provided to enhance_faces.")
@@ -166,111 +174,132 @@ class FaceDetailer:
 
             # Process each detected face individually
             for idx, det in enumerate(face_detections, start=1):
-                # Extract bounding box coordinates and ensure they are within image boundaries
-                x1, y1, x2, y2 = map(int, det.xyxy[0].cpu().numpy())
-                x1 = max(x1, 0)
-                y1 = max(y1, 0)
-                x2 = min(x2, image.width)
-                y2 = min(y2, image.height)
+                log_gpu_memory(f"before processing face {idx}")
+                try:
+                    # Extract bounding box coordinates and ensure they are within image boundaries
+                    x1, y1, x2, y2 = map(int, det.xyxy[0].cpu().numpy())
+                    x1 = max(x1, 0)
+                    y1 = max(y1, 0)
+                    x2 = min(x2, image.width)
+                    y2 = min(y2, image.height)
 
-                # Calculate padding based on padding_ratio
-                box_width = x2 - x1
-                box_height = y2 - y1
-                pad_x = int(box_width * self.padding_ratio)
-                pad_y = int(box_height * self.padding_ratio)
+                    # Calculate padding based on padding_ratio
+                    box_width = x2 - x1
+                    box_height = y2 - y1
+                    pad_x = int(box_width * self.padding_ratio)
+                    pad_y = int(box_height * self.padding_ratio)
 
-                logger.info(f"Face {idx} original bbox: ({x1}, {y1}, {x2}, {y2})")
-                logger.info(f"Face {idx} padded bbox: ({x1 - pad_x}, {y1 - pad_y}, {x2 + pad_x}, {y2 + pad_y})")
+                    logger.info(f"Face {idx} original bbox: ({x1}, {y1}, {x2}, {y2})")
+                    logger.info(f"Face {idx} padded bbox: ({x1 - pad_x}, {y1 - pad_y}, {x2 + pad_x}, {y2 + pad_y})")
 
-                # Apply padding, ensuring coordinates stay within image boundaries
-                x1_padded = max(x1 - pad_x, 0)
-                y1_padded = max(y1 - pad_y, 0)
-                x2_padded = min(x2 + pad_x, image.width)
-                y2_padded = min(y2 + pad_y, image.height)
+                    # Apply padding, ensuring coordinates stay within image boundaries
+                    x1_padded = max(x1 - pad_x, 0)
+                    y1_padded = max(y1 - pad_y, 0)
+                    x2_padded = min(x2 + pad_x, image.width)
+                    y2_padded = min(y2 + pad_y, image.height)
 
-                # Crop the padded face region from the original image
-                face_region = img_rgb.crop((x1_padded, y1_padded, x2_padded, y2_padded))
-                debug_images[f'face_{idx}_before_landmarks'] = face_region
+                    # Crop the padded face region from the original image
+                    face_region = img_rgb.crop((x1_padded, y1_padded, x2_padded, y2_padded))
+                    # debug_images[f'face_{idx}_before_landmarks'] = face_region
 
-                # Convert cropped face to NumPy array for MediaPipe processing
-                face_np = np.array(face_region)
+                    # Convert cropped face to NumPy array for MediaPipe processing
+                    face_np = np.array(face_region)
 
-                # Perform facial landmark detection using MediaPipe Face Mesh
-                results = self.face_mesh.process(face_np)
+                    # Perform facial landmark detection using MediaPipe Face Mesh
+                    results = self.face_mesh.process(face_np)
 
-                if not results.multi_face_landmarks:
-                    logger.warning(f"No facial landmarks detected for face {idx}. Skipping.")
-                    continue
+                    if not results.multi_face_landmarks:
+                        logger.warning(f"No facial landmarks detected for face {idx}. Skipping.")
+                        continue
 
-                logger.info(f"Detected landmarks for face {idx}.")
+                    logger.info(f"Detected landmarks for face {idx}.")
 
-                # Draw landmarks on the cropped face for debugging
-                img_with_landmarks = face_region.copy()
-                draw = ImageDraw.Draw(img_with_landmarks)
-                for landmarks in results.multi_face_landmarks:
-                    for lm in landmarks.landmark:
-                        x = int(lm.x * face_region.width)
-                        y = int(lm.y * face_region.height)
-                        draw.ellipse((x - 1, y - 1, x + 1, y + 1), fill=(255, 0, 0))
-                debug_images[f'face_{idx}_after_landmarks'] = img_with_landmarks
+                    # Draw landmarks on the cropped face for debugging
+                    img_with_landmarks = face_region.copy()
+                    draw = ImageDraw.Draw(img_with_landmarks)
+                    for landmarks in results.multi_face_landmarks:
+                        for lm in landmarks.landmark:
+                            x = int(lm.x * face_region.width)
+                            y = int(lm.y * face_region.height)
+                            draw.ellipse((x - 1, y - 1, x + 1, y + 1), fill=(255, 0, 0))
+                    # debug_images[f'face_{idx}_after_landmarks'] = img_with_landmarks
 
-                # Create a precise mask using the detected facial landmarks
-                face_mask = self.create_precise_mask_with_landmarks(face_region, results.multi_face_landmarks)
-                face_mask = face_mask.resize(face_region.size, resample=Image.NEAREST)
-                debug_images[f'face_{idx}_mask'] = face_mask
+                    # Create a precise mask using the detected facial landmarks
+                    face_mask = self.create_precise_mask_with_landmarks(face_region, results.multi_face_landmarks)
+                    face_mask = face_mask.resize(face_region.size, resample=Image.NEAREST)
+                    # debug_images[f'face_{idx}_mask'] = face_mask
 
-                # Create a control image from the facial landmarks for ControlNet
-                control_image = Image.new('RGB', face_region.size, (0, 0, 0))
-                draw_control = ImageDraw.Draw(control_image)
-                for landmarks in results.multi_face_landmarks:
-                    for lm in landmarks.landmark:
-                        landmark_x = int(lm.x * face_region.width)
-                        landmark_y = int(lm.y * face_region.height)
-                        # Draw a single white pixel for each landmark
-                        control_image.putpixel((landmark_x, landmark_y), (255, 255, 255))
-                debug_images[f'face_{idx}_control'] = control_image
+                    # Create a control image from the facial landmarks for ControlNet
+                    control_image = Image.new('RGB', face_region.size, (0, 0, 0))
+                    draw_control = ImageDraw.Draw(control_image)
+                    for landmarks in results.multi_face_landmarks:
+                        for lm in landmarks.landmark:
+                            landmark_x = int(lm.x * face_region.width)
+                            landmark_y = int(lm.y * face_region.height)
+                            # Draw a single white pixel for each landmark
+                            control_image.putpixel((landmark_x, landmark_y), (255, 255, 255))
+                    # debug_images[f'face_{idx}_control'] = control_image
 
-                # Upscale the face region, mask, and control image
-                upscale_factor = 5  # You can adjust this factor as needed
-                high_res_size = (face_region.width * upscale_factor, face_region.height * upscale_factor)
-                face_region_high_res = face_region.resize(high_res_size, resample=Image.LANCZOS)
-                face_mask_high_res = face_mask.resize(high_res_size, resample=Image.NEAREST)
-                control_image_high_res = control_image.resize(high_res_size, resample=Image.NEAREST)
+                    # Upscale the face region, mask, and control image
+                    upscale_factor = 5  # You can adjust this factor as needed
+                    high_res_size = (face_region.width * upscale_factor, face_region.height * upscale_factor)
+                    face_region_high_res = face_region.resize(high_res_size, resample=Image.LANCZOS)
+                    face_mask_high_res = face_mask.resize(high_res_size, resample=Image.NEAREST)
+                    control_image_high_res = control_image.resize(high_res_size, resample=Image.NEAREST)
 
-                debug_images[f'face_{idx}_high_res_before_inpaint'] = face_region_high_res
-                debug_images[f'face_{idx}_high_res_mask'] = face_mask_high_res
-                debug_images[f'face_{idx}_high_res_control'] = control_image_high_res
+                    # debug_images[f'face_{idx}_high_res_before_inpaint'] = face_region_high_res
+                    # debug_images[f'face_{idx}_high_res_mask'] = face_mask_high_res
+                    # debug_images[f'face_{idx}_high_res_control'] = control_image_high_res
 
-                # Inpaint the high-resolution face using embeddings
-                with autocast(self.device):
-                    result = self.pipe(
-                        prompt_embeds=face_prompt_embeds,
-                        negative_prompt_embeds=face_negative_prompt_embeds,
-                        pooled_prompt_embeds=face_pooled_prompt_embeds,
-                        negative_pooled_prompt_embeds=face_negative_pooled_prompt_embeds,
-                        image=face_region_high_res,
-                        mask_image=face_mask_high_res,
-                        control_image=control_image_high_res,
-                        num_inference_steps=60,
-                        guidance_scale=7.5,
-                        strength=0.4,
-                        height=high_res_size[1],
-                        width=high_res_size[0]
-                    )
-                enhanced_face_high_res = result.images[0]
-                debug_images[f'face_{idx}_high_res_inpainted'] = enhanced_face_high_res
+                    # Inpaint the high-resolution face using embeddings
+                    with torch.no_grad(), autocast(self.device):
+                        result = self.pipe(
+                            prompt_embeds=face_prompt_embeds,
+                            negative_prompt_embeds=face_negative_prompt_embeds,
+                            pooled_prompt_embeds=face_pooled_prompt_embeds,
+                            negative_pooled_prompt_embeds=face_negative_pooled_prompt_embeds,
+                            image=face_region_high_res,
+                            mask_image=face_mask_high_res,
+                            control_image=control_image_high_res,
+                            num_inference_steps=60,
+                            guidance_scale=7.5,
+                            strength=0.4,
+                            height=high_res_size[1],
+                            width=high_res_size[0]
+                        )
+                    enhanced_face_high_res = result.images[0]
+                    # debug_images[f'face_{idx}_high_res_inpainted'] = enhanced_face_high_res
 
-                # Downscale the enhanced face back to original face region size
-                enhanced_face = enhanced_face_high_res.resize(face_region.size, resample=Image.LANCZOS)
-                debug_images[f'face_{idx}_enhanced'] = enhanced_face
+                    # Downscale the enhanced face back to original face region size
+                    enhanced_face = enhanced_face_high_res.resize(face_region.size, resample=Image.LANCZOS)
+                    # debug_images[f'face_{idx}_enhanced'] = enhanced_face
 
-                # Paste the enhanced face back into the original image
-                final_image.paste(enhanced_face, (x1_padded, y1_padded), face_mask)
+                    # Paste the enhanced face back into the original image
+                    final_image.paste(enhanced_face, (x1_padded, y1_padded), face_mask)
+
+                    log_gpu_memory(f"after processing face {idx}")
+                except Exception as e:
+                    logger.warning(f"Error processing face {idx}: {e}")
+                    continue  # Skip to the next face
+
+                finally:
+                    # Delete variables and free memory
+                    for var_name in [
+                        'face_region', 'face_mask', 'control_image',
+                        'face_region_high_res', 'face_mask_high_res', 'control_image_high_res',
+                        'enhanced_face_high_res', 'enhanced_face', 'result'
+                    ]:
+                        if var_name in locals():
+                            del locals()[var_name]
+                    torch.cuda.empty_cache()
+                    gc.collect()
 
             # Clean up embeddings and memory
             del face_prompt_embeds, face_negative_prompt_embeds, face_pooled_prompt_embeds, face_negative_pooled_prompt_embeds
             torch.cuda.empty_cache()
             gc.collect()
+
+            log_gpu_memory("after face enhancement")
 
             return {'enhanced_face': final_image, 'debug_images': debug_images}
         except Exception as e:
