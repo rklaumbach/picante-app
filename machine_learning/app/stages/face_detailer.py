@@ -81,8 +81,8 @@ class FaceDetailer:
 
         self.tokenizer = None  # Will be set when initializing the pipeline
 
-        if self.pipe is None:
-            self.initialize_pipeline()
+        # if self.pipe is None:
+        #     self.initialize_pipeline()
 
     def initialize_pipeline(self):
         """
@@ -293,7 +293,7 @@ class FaceDetailer:
                     gc.collect()
 
             # Clean up embeddings and memory
-            del face_prompt_embeds, face_negative_prompt_embeds, face_pooled_prompt_embeds, face_negative_pooled_prompt_embeds
+            #del face_prompt_embeds, face_negative_prompt_embeds, face_pooled_prompt_embeds, face_negative_pooled_prompt_embeds
             torch.cuda.empty_cache()
             gc.collect()
 

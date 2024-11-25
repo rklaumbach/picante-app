@@ -49,8 +49,17 @@ class Txt2ImgFaceDetailUpscaleWorkflow:
         self.scaling = scaling
 
         # Store the pre-initialized pipelines
-        self.txt2img_pipeline = txt2img_pipeline
-        self.face_detailer_pipeline = face_detailer_pipeline
+        self.txt2img_pipeline = txt2img_pipeline.to('cuda')
+        self.txt2img_pipeline.enable_xformers_memory_efficient_attention()
+        self.face_detailer_pipeline = face_detailer_pipeline.to('cuda')
+        self.face_detailer_pipeline.enable_xformers_memory_efficient_attention()
+        
+        if self.face_detailer_pipeline is None:
+            logger.info("Face Detailer Pipe is none in workflow")
+
+        if self.txt2img_pipeline is None:
+            logger.info("Txt2Img Pipe is none in workflow")
+
 
     def should_run_step(self, selected_steps):
         """

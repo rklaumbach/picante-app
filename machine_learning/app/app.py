@@ -1,5 +1,6 @@
 # app/app.py
 
+import threading
 from typing import List, Optional, Dict
 import modal
 from modal import Function, asgi_app, Queue, Dict as ModalDict, Secret
@@ -76,34 +77,6 @@ job_results = ModalDict.from_name("job-results", create_if_missing=True)
 # Initialize FastAPI
 fastapi_app = FastAPI(title="Image Processing API")
 
-# ------------------------ One-Time Operations ------------------------
-
-# # One-time Transformer cache migration
-# from transformers import cache_utils
-
-# def migrate_transformers_cache():
-#     try:
-#         cache_utils.move_cache()
-#         logger.info("Transformers cache migrated successfully.")
-#     except Exception as e:
-#         logger.warning("Transformers cache migration skipped or already migrated.")
-
-# # One-time Ultralytics config creation
-# from ultralytics import YOLO
-
-# def create_ultralytics_config():
-#     try:
-#         YOLO.create_settings_file()
-#         logger.info("Ultralytics Settings file created successfully.")
-#     except Exception as e:
-#         logger.warning("Ultralytics Settings file already exists.")
-
-# # Execute one-time operations
-# migrate_transformers_cache()
-# create_ultralytics_config()
-
-# -----------------------------------------------------------------------
-
 # Define Pydantic Models
 class Txt2ImgRequest(BaseModel):
     user_id: str  # Added user_id
@@ -139,6 +112,240 @@ class JobStatusResponse(BaseModel):
     status: str
     image_urls: Optional[Dict[str, str]] = None
     reason: Optional[str] = None
+
+@app.cls(
+    gpu="A100",
+    secrets=[supabase],
+    container_idle_timeout=60,
+)
+class Txt2ImgService:
+    def __init__(self):
+        # Initialize your pipelines here
+        self.lock = threading.Lock()
+        #self.initialize_pipelines()
+        #self.txt2img_pipeline = self.initialize_txt2img_pipeline()
+        #self.face_detailer_pipeline = self.initialize_face_detailer_pipeline()
+        self.fastapi_app = FastAPI(title="Image Processing API")
+        self.fastapi_app.post("/generate-txt2img")(self.generate_txt2img)
+        self.fastapi_app.get("/job-status/{job_id}")(self.get_job_status)
+        
+    @modal.enter()
+    def initialize_pipelines(self):
+        self.txt2img_pipeline = self.initialize_txt2img_pipeline()
+        self.face_detailer_pipeline = self.initialize_face_detailer_pipeline()
+        
+    def initialize_txt2img_pipeline(self):
+        model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+
+        txt2img_pipeline = StableDiffusionXLPipeline.from_single_file(
+            model_file,
+            torch_dtype=torch.float16,
+            variant="fp16",
+            use_safetensors=True,
+        )#.to('cuda')
+
+        # Set Clip Skip if applicable
+        if hasattr(txt2img_pipeline.text_encoder, 'config') and hasattr(txt2img_pipeline.text_encoder.config, 'clip_skip'):
+            txt2img_pipeline.text_encoder.config.clip_skip = 2
+        if hasattr(txt2img_pipeline.text_encoder_2, 'config') and hasattr(txt2img_pipeline.text_encoder_2.config, 'clip_skip'):
+            txt2img_pipeline.text_encoder_2.config.clip_skip = 2
+
+        return txt2img_pipeline
+
+    def initialize_face_detailer_pipeline(self):
+        controlnet_model_path = "/app/models/controlnet/openpose"
+
+        # Load ControlNet model
+        controlnet = ControlNetModel.from_pretrained(
+            controlnet_model_path,
+            torch_dtype=torch.float16,
+            use_safetensors=False  # Assuming .safetensors files
+        )#.to('cuda')
+
+        model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+
+        face_detailer_pipeline = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
+            model_file,
+            controlnet=controlnet,
+            torch_dtype=torch.float16,
+            variant="fp16",
+            use_safetensors=True,
+        )#.to('cuda')
+        return face_detailer_pipeline
+
+    #@modal.web_endpoint(method="GET")
+    #@modal.method()
+    def get_job_status(self, job_id: str = Query(...)):
+        """
+        Endpoint to check the status of a submitted job.
+        Expects 'job_id' as a query parameter.
+        """
+        try:
+            logger.info(f"GET /job-status called with job_id: {job_id}")
+
+            job = job_results.get(job_id)
+            if not job:
+                logger.warning(f"Job ID {job_id} not found.")
+                raise HTTPException(status_code=404, detail="Job ID not found.")
+            
+            status = job.get('status', 'unknown')
+            response = {'status': status}
+            
+            if status == 'completed':
+                response['image_urls'] = job.get('image_urls', {})
+                response['width'] = job.get('width')
+                response['height'] = job.get('height')
+            elif status == 'failed':
+                response['reason'] = job.get('reason', 'Unknown error.')
+            
+            return JobStatusResponse(**response)
+        except Exception as e:
+            logger.exception("Error in /job-status:")
+            raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+    #@modal.web_endpoint(method="POST")
+    #@modal.method()
+    async def generate_txt2img(self, request: Txt2ImgRequest):
+        """
+        Endpoint to submit a Txt2Img image generation job.
+        """
+        # Create a unique job ID and timestamp
+        job_id = str(uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat()
+
+        # Prepare parameters
+        params = {
+            'job_id': job_id,
+            'user_id': request.user_id,
+            'steps': request.steps,
+            'upscale_enabled': request.upscale_enabled,
+            'timestamp': timestamp,
+            'image_prompt': request.image_prompt,
+            'negative_prompt': request.negative_prompt,
+            'face_prompt': request.face_prompt,
+            'face_negative_prompt': request.face_negative_prompt,
+            'height': request.height,
+            'width': request.width,
+            'device': 'cuda',
+            'scaling': request.scaling
+        }
+
+        # Since we are in the same container, we can call the method directly
+        task = self.process_txt2img.spawn(params)
+
+            # Store the task ID and initial status with timestamp
+        job_results[job_id] = {
+            'modal_task_id': task.object_id,
+            'status': 'queued',
+            'image_urls': {},
+            'timestamp': timestamp
+        }
+    
+        return ImgResponse(job_id=job_id, status='queued')
+    
+    @modal.method()
+    def process_txt2img(self, job: Dict):
+        """
+        Modal Function to process Txt2Img image generation jobs.
+        """
+        with self.lock:
+
+            if self.face_detailer_pipeline is None:
+                logger.info("Face Detailer Pipe is none in process_txt2img")
+
+            if self.txt2img_pipeline is None:
+                logger.info("Txt2Img Pipe is none in process_txt2img")
+
+            try:
+                supabase_admin = get_supabase_client()
+                workflow = Txt2ImgFaceDetailUpscaleWorkflow(
+                    device=job.get('device', 'cuda'),
+                    steps=job.get('steps', 'all'),
+                    upscale_enabled=job.get('upscale_enabled', True),
+                    timestamp=job.get('timestamp'),
+                    image_prompt=job.get('image_prompt', ""),
+                    negative_prompt=job.get('negative_prompt'),
+                    face_prompt=job.get('face_prompt', ""),
+                    face_negative_prompt=job.get('face_negative_prompt', ""),
+                    height=job.get('height', 1024),
+                    width=job.get('width', 1024),
+                    scaling=job.get('scaling'),
+                    txt2img_pipeline=self.txt2img_pipeline,
+                    face_detailer_pipeline=self.face_detailer_pipeline
+                )
+
+                logger.info(f"Scaling in process_txt2img = {job.get('scaling')}")
+                
+                images_dict = workflow.run()
+                
+                if images_dict and 'final_image' in images_dict:
+                    user_id = job.get('user_id')  # Ensure user_id is part of the job data
+                    if not user_id:
+                        raise Exception("User ID not provided in job data.")
+                    
+                    final_image = images_dict['final_image']
+                    
+                    # Convert PIL Image to bytes
+                    img_byte_arr = BytesIO()
+                    final_image.save(img_byte_arr, format='PNG')
+                    img_bytes = img_byte_arr.getvalue()
+
+                    # Define a unique filename, e.g., using timestamp
+                    filename = f"{job['timestamp']}_final.png"
+
+                    # Upload to Supabase Storage
+                    image_url = upload_image_to_supabase(img_bytes, user_id, filename)
+
+                    upscaled_width = job.get('width')*job.get('scaling') if job.get('upscale_enabled') else job.get('width')
+                    upscaled_height = job.get('height')*job.get('scaling') if job.get('upscale_enabled') else job.get('height')
+
+                    # Insert into 'images' table with proper timestamp
+                    supabase_admin.from_("images").insert({
+                        "user_id": user_id,
+                        "image_path": f"{user_id}/{filename}",
+                        "filename": filename,
+                        "body_prompt": job.get('image_prompt', ''),
+                        "face_prompt": job.get('face_prompt', ''),
+                        "width": upscaled_width,
+                        "height": upscaled_height,
+                        "created_at": job.get('timestamp')  # Actual timestamp
+                    }).execute()
+
+                    # Update job status
+                    job_info = job_results.get(job.get('job_id'))
+                    if not job_info:
+                        logger.error(f"Job ID {job.get('job_id')} not found in job_results.")
+                        raise Exception("Job ID not found in job_results.")
+                    
+                    job_info['status'] = 'completed'
+                    job_info['image_urls'] = {'final_image': image_url}
+                    job_results[job.get('job_id')] = job_info
+
+                    logger.info(f"Job {job.get('job_id')} completed successfully.")
+                    return {'status': 'completed',
+                            'image_urls': {'final_image': image_url},
+                            'width': job.get('width')*job.get('scaling'),
+                            'height': job.get('height')*job.get('scaling')}
+                else:
+                    # Update job status to failed
+                    job_info = job_results.get(job.get('job_id'))
+                    job_info['status'] = 'failed'
+                    job_info['reason'] = 'Image generation failed.'
+                    job_results[job.get('job_id')] = job_info
+                    logger.error(f"Job {job.get('job_id')} failed: Image generation failed.")
+                    return {'status': 'failed', 'reason': 'Image generation failed.'}
+            except Exception as e:
+                # Update job status to failed with reason
+                logger.exception("Error processing Txt2Img job:")
+                job_id = job.get('job_id', 'unknown')
+                job_info = job_results.get(job_id, {})
+                job_info['status'] = 'failed'
+                job_info['reason'] = str(e)
+                job_results[job_id] = job_info
+                return {'status': 'failed', 'reason': str(e)}
+
+txt2img_service = Txt2ImgService()
+
 
 # Initialize Supabase client using Modal secrets
 def get_supabase_client() -> Client:
@@ -208,47 +415,48 @@ def upload_image_to_supabase(image_bytes: bytes, user_id: str, filename: str) ->
         raise
 
 # Define FastAPI routes
-@fastapi_app.post("/generate-txt2img", response_model=ImgResponse)
-async def generate_txt2img(request: Txt2ImgRequest):
-    """
-    Endpoint to submit a Txt2Img image generation job.
-    """
+# @fastapi_app.post("/generate-txt2img", response_model=ImgResponse)
+# async def generate_txt2img(request: Txt2ImgRequest):
+#     """
+#     Endpoint to submit a Txt2Img image generation job.
+#     """
 
-    # Create a unique job ID and timestamp
-    job_id = str(uuid4())
-    timestamp = datetime.now(timezone.utc).isoformat()
-    
-    # Prepare parameters
-    params = {
-        'job_id': job_id,
-        'user_id': request.user_id,  # Include user_id
-        'steps': request.steps,
-        'upscale_enabled': request.upscale_enabled,
-        'timestamp': timestamp,  # Actual timestamp
-        'image_prompt': request.image_prompt,
-        'negative_prompt': request.negative_prompt,
-        'face_prompt': request.face_prompt,
-        'face_negative_prompt': request.face_negative_prompt,
-        'height': request.height,
-        'width': request.width,
-        'device': 'cuda',  # Or make this configurable
-        'scaling': request.scaling
-    }
-    
-    # Enqueue the Modal Function
-    task = process_txt2img.spawn(params)
-    
-    # Store the task ID and initial status with timestamp
-    job_results[job_id] = {
-        'modal_task_id': task.object_id,
-        'status': 'queued',
-        'image_urls': {},
-        'timestamp': timestamp
-    }
-    
-    return ImgResponse(job_id=job_id, status='queued')
+#     # Create a unique job ID and timestamp
+#     job_id = str(uuid4())
+#     timestamp = datetime.now(timezone.utc).isoformat()
 
-@fastapi_app.post("/generate-img2img", response_model=ImgResponse)
+#     # Prepare parameters
+#     params = {
+#         'job_id': job_id,
+#         'user_id': request.user_id,  # Include user_id
+#         'steps': request.steps,
+#         'upscale_enabled': request.upscale_enabled,
+#         'timestamp': timestamp,  # Actual timestamp
+#         'image_prompt': request.image_prompt,
+#         'negative_prompt': request.negative_prompt,
+#         'face_prompt': request.face_prompt,
+#         'face_negative_prompt': request.face_negative_prompt,
+#         'height': request.height,
+#         'width': request.width,
+#         'device': 'cuda',  # Or make this configurable
+#         'scaling': request.scaling
+#     }
+
+#     # Enqueue the method call using the singleton instance
+#     task = txt2img_service.process_txt2img.submit(params)
+
+#     # Store the task Future and initial status with timestamp
+#     job_results[job_id] = {
+#         'task_future': task,
+#         'status': 'queued',
+#         'image_urls': {},
+#         'timestamp': timestamp
+#     }
+
+#     return ImgResponse(job_id=job_id, status='queued')
+
+
+#@fastapi_app.post("/generate-img2img", response_model=ImgResponse)
 async def generate_img2img(
     user_id: str = Form(...),  # Required Form field
     steps: str = Form('all'),
@@ -329,169 +537,139 @@ async def generate_img2img(
     
     return ImgResponse(job_id=job_id, status='queued')
 
-@fastapi_app.get("/job-status/{job_id}", response_model=JobStatusResponse)
+#@fastapi_app.get("/job-status/{job_id}", response_model=JobStatusResponse)
 def get_job_status(job_id: str):
-    """
-    Endpoint to check the status of a submitted job.
-    """
     job = job_results.get(job_id)
     if not job:
         logger.warning(f"Job ID {job_id} not found.")
         raise HTTPException(status_code=404, detail="Job ID not found.")
-    
-    status = job.get('status', 'unknown')
-    response = {'status': status}
-    
-    if status == 'completed':
+
+    # Check if the task has completed
+    if job['status'] == 'queued' and job['task_future'].done():
+        result = job['task_future'].result()
+        job['status'] = result.get('status', 'unknown')
+        job['image_urls'] = result.get('image_urls', {})
+        job['width'] = result.get('width')
+        job['height'] = result.get('height')
+        if job['status'] == 'failed':
+            job['reason'] = result.get('reason', 'Unknown error.')
+
+    response = {'status': job['status']}
+    if job['status'] == 'completed':
         response['image_urls'] = job.get('image_urls', {})
-    elif status == 'failed':
+        response['width'] = job.get('width')
+        response['height'] = job.get('height')
+    elif job['status'] == 'failed':
         response['reason'] = job.get('reason', 'Unknown error.')
-    
+
     return response
+
 
 # Define Modal Functions for processing jobs
 
 # Function to process Txt2Img jobs
-@app.function(gpu="A100", secrets=[supabase])
-def process_txt2img(job: Dict):
-    """
-    Modal Function to process Txt2Img image generation jobs.
-    """
+# @app.function(gpu="A100", secrets=[supabase])
+# def process_txt2img(job: Dict):
+#     """
+#     Modal Function to process Txt2Img image generation jobs.
+#     """
 
-    try:
-        global txt2img_pipeline, face_detailer_pipeline
+#     try:
+#         # Get the singleton instance
 
-        # Initialize txt2img_pipeline if not already done
-        if 'txt2img_pipeline' not in globals() or txt2img_pipeline is None:
-            model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+#         # Access the pipelines
+#         txt2img_pipeline = pipeline_holder.txt2img_pipeline
+#         face_detailer_pipeline = pipeline_holder.face_detailer_pipeline
+#     except Exception as e:
+#         logger.exception("Failed to initialize pipelines")
 
-            txt2img_pipeline = StableDiffusionXLPipeline.from_single_file(
-                model_file,
-                torch_dtype=torch.float16,
-                variant="fp16",
-                use_safetensors=True,
-            ).to('cuda')
+#     try:
+#         supabase_admin = get_supabase_client()
+#         workflow = Txt2ImgFaceDetailUpscaleWorkflow(
+#             device=job.get('device', 'cuda'),
+#             steps=job.get('steps', 'all'),
+#             upscale_enabled=job.get('upscale_enabled', True),
+#             timestamp=job.get('timestamp'),
+#             image_prompt=job.get('image_prompt', ""),
+#             negative_prompt=job.get('negative_prompt'),
+#             face_prompt=job.get('face_prompt', ""),
+#             face_negative_prompt=job.get('face_negative_prompt', ""),
+#             height=job.get('height', 1024),
+#             width=job.get('width', 1024),
+#             scaling=job.get('scaling'),
+#             txt2img_pipeline=txt2img_pipeline,
+#             face_detailer_pipeline=face_detailer_pipeline
+#         )
 
-            # Set Clip Skip if applicable
-            if hasattr(txt2img_pipeline.text_encoder, 'config') and hasattr(txt2img_pipeline.text_encoder.config, 'clip_skip'):
-                txt2img_pipeline.text_encoder.config.clip_skip = 2
-            if hasattr(txt2img_pipeline.text_encoder_2, 'config') and hasattr(txt2img_pipeline.text_encoder_2.config, 'clip_skip'):
-                txt2img_pipeline.text_encoder_2.config.clip_skip = 2
-
-            txt2img_pipeline.enable_xformers_memory_efficient_attention()
-
-        # Initialize face_detailer_pipeline if not already done
-        if 'face_detailer_pipeline' not in globals() or face_detailer_pipeline is None:
-            controlnet_model_path = "/app/models/controlnet/openpose"
-
-            # Load ControlNet model
-            controlnet = ControlNetModel.from_pretrained(
-                controlnet_model_path,
-                torch_dtype=torch.float16,
-                use_safetensors=False  # Assuming .safetensors files
-            ).to('cuda')
-
-            model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
-
-            face_detailer_pipeline = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
-                model_file,
-                controlnet=controlnet,
-                torch_dtype=torch.float16,
-                variant="fp16",
-                use_safetensors=True,
-            ).to('cuda')
-
-            face_detailer_pipeline.enable_xformers_memory_efficient_attention()
-    except Exception as e:
-        logger.exception("Failed to initialize pipelines")
-
-    try:
-        supabase_admin = get_supabase_client()
-        workflow = Txt2ImgFaceDetailUpscaleWorkflow(
-            device=job.get('device', 'cuda'),
-            steps=job.get('steps', 'all'),
-            upscale_enabled=job.get('upscale_enabled', True),
-            timestamp=job.get('timestamp'),
-            image_prompt=job.get('image_prompt', ""),
-            negative_prompt=job.get('negative_prompt'),
-            face_prompt=job.get('face_prompt', ""),
-            face_negative_prompt=job.get('face_negative_prompt', ""),
-            height=job.get('height', 1024),
-            width=job.get('width', 1024),
-            scaling=job.get('scaling'),
-            txt2img_pipeline=txt2img_pipeline,
-            face_detailer_pipeline=face_detailer_pipeline
-        )
-
-        logger.info(f"Scaling in process_txt2img = {job.get('scaling')}")
+#         logger.info(f"Scaling in process_txt2img = {job.get('scaling')}")
         
-        images_dict = workflow.run()
+#         images_dict = workflow.run()
         
-        if images_dict and 'final_image' in images_dict:
-            user_id = job.get('user_id')  # Ensure user_id is part of the job data
-            if not user_id:
-                raise Exception("User ID not provided in job data.")
+#         if images_dict and 'final_image' in images_dict:
+#             user_id = job.get('user_id')  # Ensure user_id is part of the job data
+#             if not user_id:
+#                 raise Exception("User ID not provided in job data.")
             
-            final_image = images_dict['final_image']
+#             final_image = images_dict['final_image']
             
-            # Convert PIL Image to bytes
-            img_byte_arr = BytesIO()
-            final_image.save(img_byte_arr, format='PNG')
-            img_bytes = img_byte_arr.getvalue()
+#             # Convert PIL Image to bytes
+#             img_byte_arr = BytesIO()
+#             final_image.save(img_byte_arr, format='PNG')
+#             img_bytes = img_byte_arr.getvalue()
 
-            # Define a unique filename, e.g., using timestamp
-            filename = f"{job['timestamp']}_final.png"
+#             # Define a unique filename, e.g., using timestamp
+#             filename = f"{job['timestamp']}_final.png"
 
-            # Upload to Supabase Storage
-            image_url = upload_image_to_supabase(img_bytes, user_id, filename)
+#             # Upload to Supabase Storage
+#             image_url = upload_image_to_supabase(img_bytes, user_id, filename)
 
-            upscaled_width = job.get('width')*job.get('scaling') if job.get('upscale_enabled') else job.get('width')
-            upscaled_height = job.get('height')*job.get('scaling') if job.get('upscale_enabled') else job.get('height')
+#             upscaled_width = job.get('width')*job.get('scaling') if job.get('upscale_enabled') else job.get('width')
+#             upscaled_height = job.get('height')*job.get('scaling') if job.get('upscale_enabled') else job.get('height')
 
-            # Insert into 'images' table with proper timestamp
-            supabase_admin.from_("images").insert({
-                "user_id": user_id,
-                "image_path": f"{user_id}/{filename}",
-                "filename": filename,
-                "body_prompt": job.get('image_prompt', ''),
-                "face_prompt": job.get('face_prompt', ''),
-                "width": upscaled_width,
-                "height": upscaled_height,
-                "created_at": job.get('timestamp')  # Actual timestamp
-            }).execute()
+#             # Insert into 'images' table with proper timestamp
+#             supabase_admin.from_("images").insert({
+#                 "user_id": user_id,
+#                 "image_path": f"{user_id}/{filename}",
+#                 "filename": filename,
+#                 "body_prompt": job.get('image_prompt', ''),
+#                 "face_prompt": job.get('face_prompt', ''),
+#                 "width": upscaled_width,
+#                 "height": upscaled_height,
+#                 "created_at": job.get('timestamp')  # Actual timestamp
+#             }).execute()
 
-            # Update job status
-            job_info = job_results.get(job.get('job_id'))
-            if not job_info:
-                logger.error(f"Job ID {job.get('job_id')} not found in job_results.")
-                raise Exception("Job ID not found in job_results.")
+#             # Update job status
+#             job_info = job_results.get(job.get('job_id'))
+#             if not job_info:
+#                 logger.error(f"Job ID {job.get('job_id')} not found in job_results.")
+#                 raise Exception("Job ID not found in job_results.")
             
-            job_info['status'] = 'completed'
-            job_info['image_urls'] = {'final_image': image_url}
-            job_results[job.get('job_id')] = job_info
+#             job_info['status'] = 'completed'
+#             job_info['image_urls'] = {'final_image': image_url}
+#             job_results[job.get('job_id')] = job_info
 
-            logger.info(f"Job {job.get('job_id')} completed successfully.")
-            return {'status': 'completed',
-                    'image_urls': {'final_image': image_url},
-                    'width': job.get('width')*job.get('scaling'),
-                    'height': job.get('height')*job.get('scaling')}
-        else:
-            # Update job status to failed
-            job_info = job_results.get(job.get('job_id'))
-            job_info['status'] = 'failed'
-            job_info['reason'] = 'Image generation failed.'
-            job_results[job.get('job_id')] = job_info
-            logger.error(f"Job {job.get('job_id')} failed: Image generation failed.")
-            return {'status': 'failed', 'reason': 'Image generation failed.'}
-    except Exception as e:
-        # Update job status to failed with reason
-        logger.exception("Error processing Txt2Img job:")
-        job_id = job.get('job_id', 'unknown')
-        job_info = job_results.get(job_id, {})
-        job_info['status'] = 'failed'
-        job_info['reason'] = str(e)
-        job_results[job_id] = job_info
-        return {'status': 'failed', 'reason': str(e)}
+#             logger.info(f"Job {job.get('job_id')} completed successfully.")
+#             return {'status': 'completed',
+#                     'image_urls': {'final_image': image_url},
+#                     'width': job.get('width')*job.get('scaling'),
+#                     'height': job.get('height')*job.get('scaling')}
+#         else:
+#             # Update job status to failed
+#             job_info = job_results.get(job.get('job_id'))
+#             job_info['status'] = 'failed'
+#             job_info['reason'] = 'Image generation failed.'
+#             job_results[job.get('job_id')] = job_info
+#             logger.error(f"Job {job.get('job_id')} failed: Image generation failed.")
+#             return {'status': 'failed', 'reason': 'Image generation failed.'}
+#     except Exception as e:
+#         # Update job status to failed with reason
+#         logger.exception("Error processing Txt2Img job:")
+#         job_id = job.get('job_id', 'unknown')
+#         job_info = job_results.get(job_id, {})
+#         job_info['status'] = 'failed'
+#         job_info['reason'] = str(e)
+#         job_results[job_id] = job_info
+#         return {'status': 'failed', 'reason': str(e)}
 
 # Function to process Img2Img jobs
 @app.function(gpu="A100", secrets=[supabase])
@@ -618,7 +796,7 @@ def list_nvrtc_libraries():
     return {"nvrtc_paths": nvrtc_paths}
 
 # Define FastAPI route for job status using query parameters
-@fastapi_app.get("/job-status", response_model=JobStatusResponse)
+#@fastapi_app.get("/job-status", response_model=JobStatusResponse)
 async def get_job_status_endpoint(job_id: str = Query(...)):
     """
     Endpoint to check the status of a submitted job.
@@ -651,4 +829,4 @@ async def get_job_status_endpoint(job_id: str = Query(...)):
 @app.function()
 @asgi_app()
 def serve_fastapi():
-    return fastapi_app
+    return txt2img_service.fastapi_app

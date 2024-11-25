@@ -26,7 +26,9 @@ class ImageGenerator:
         self.pipe = pipeline  # Accept pre-initialized pipeline
 
         if self.pipe is None:
-            self.initialize_pipeline()
+            logger.info("Pipeline is none in ImageGenerator")
+        # if self.pipe is None:
+        #     self.initialize_pipeline()
 
     def initialize_pipeline(self, pipeline_type='txt2img'):
         if self.pipe is not None:
