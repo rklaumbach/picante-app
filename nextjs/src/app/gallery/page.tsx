@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
 import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog';
@@ -10,10 +10,11 @@ import BottomNav from '../../components/BottomNav';
 import ImageModal from '../../components/ImageModal';
 import { useRouter } from 'next/navigation';
 import Button from '../../components/Button';
-import { toast } from 'react-toastify'; // Import toast for notifications
-import { ImageData } from '@/types/types'; // Import the unified Image interface
+import { toast } from 'react-toastify';
+import { ImageData } from '@/types/types';
 import Image from 'next/image';
-
+import CachedImage from '@/components/CachedImage'; // Import the CachedImage component
+import { useInView } from 'react-intersection-observer';
 
 const GalleryPage: React.FC = () => {
   const { data: session, status } = useSession();
@@ -22,40 +23,66 @@ const GalleryPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const { ref, inView } = useInView({
+    threshold: 0,
+  });
+
+  const fetchImages = useCallback(async () => {
+    if (status !== 'authenticated' || loading || !hasMore) return;
+
+    setLoading(true);
+    try {
+      const url = new URL('/api/images/gallery', window.location.origin);
+      url.searchParams.append('limit', '20');
+      if (nextCursor) {
+        url.searchParams.append('cursor', nextCursor);
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data.images)) {
+          setImages((prev) => [...prev, ...data.images]);
+          setNextCursor(data.nextCursor || null);
+          setHasMore(Boolean(data.nextCursor));
+        } else {
+          console.error('Invalid data format for images:', data.images);
+          setHasMore(false);
+        }
+      } else {
+        console.error('Failed to fetch images:', response.status, response.statusText);
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error fetching images:', error);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [status, nextCursor, loading, hasMore]);
 
   useEffect(() => {
-    const fetchImages = async () => {
-      if (status === 'authenticated') {
-        try {
-          const response = await fetch('/api/images/gallery', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-          });
+    if (status === 'authenticated') {
+      fetchImages();
+    } else if (status === 'unauthenticated') {
+      router.push('/'); // Redirect unauthenticated users
+    }
+  }, [status, fetchImages, router]);
 
-          if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data.images)) {
-              setImages(data.images);
-            } else {
-              console.error('Invalid data format for images:', data.images);
-            }
-          } else {
-            console.error('Failed to fetch images:', response.status, response.statusText);
-          }
-        } catch (error) {
-          console.error('Error fetching images:', error);
-        } finally {
-          setLoading(false);
-        }
-      } else if (status === 'unauthenticated') {
-        router.push('/'); // Redirect unauthenticated users
-      }
-    };
-
-    fetchImages();
-  }, [status, router]);
+  useEffect(() => {
+    if (inView && hasMore && !loading) {
+      fetchImages();
+    }
+  }, [inView, hasMore, loading, fetchImages]);
 
   const handleImageClick = (image: ImageData) => {
     setSelectedImage(image);
@@ -132,7 +159,7 @@ const GalleryPage: React.FC = () => {
     window.open(image.image_url, '_blank');
   }, []);
 
-  if (loading) {
+  if (status === 'loading' || (status === 'authenticated' && images.length === 0 && loading)) {
     return (
       <>
         <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl min-h-screen pt-20">
@@ -162,33 +189,57 @@ const GalleryPage: React.FC = () => {
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {images.map((image) => (
-                  <div
-                    key={image.id}
-                    className="relative group cursor-pointer overflow-hidden"
-                    onClick={() => handleImageClick(image)}
-                  >
-                    <Image
-                      src={image.image_url}
-                      alt={image.filename}
-                      width={image.width}
-                      height={image.height}
-                      layout="responsive"
-                      loading="lazy"
-                      className="rounded-lg transform transition-transform duration-200 hover:scale-105"
-                    />
-                    <button
-                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent triggering the image click
-                        handleDeleteClick(image.id);
-                      }}
-                      aria-label="Delete Image"
-                    >
-                      ✖
-                    </button>
-                  </div>
-                ))}
+                {images.map((image, index) => {
+                  // Attach the ref to the last image for infinite scrolling
+                  if (index === images.length - 1) {
+                    return (
+                      <div
+                        key={image.id}
+                        ref={ref}
+                        className="relative group cursor-pointer overflow-hidden"
+                        onClick={() => handleImageClick(image)}
+                      >
+                        <CachedImage imageData={image} />
+                        <button
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent triggering the image click
+                            handleDeleteClick(image.id);
+                          }}
+                          aria-label="Delete Image"
+                        >
+                          ✖
+                        </button>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div
+                        key={image.id}
+                        className="relative group cursor-pointer overflow-hidden"
+                        onClick={() => handleImageClick(image)}
+                      >
+                        <CachedImage imageData={image} />
+                        <button
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent triggering the image click
+                            handleDeleteClick(image.id);
+                          }}
+                          aria-label="Delete Image"
+                        >
+                          ✖
+                        </button>
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+            )}
+            {/* Sentinel for Infinite Scroll */}
+            {hasMore && (
+              <div ref={ref} className="h-10">
+                {loading && <p className="text-center text-gray-500">Loading more images...</p>}
               </div>
             )}
           </div>

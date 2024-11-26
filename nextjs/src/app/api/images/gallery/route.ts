@@ -65,7 +65,18 @@ export async function GET(req: NextRequest) {
     // Filter out any null entries due to errors
     const validImages = signedImages.filter((img) => img !== null);
 
-    return NextResponse.json({ images: validImages }, { status: 200 });
+    // Create the response with Cache-Control headers
+    const response = NextResponse.json(
+      { images: validImages },
+      { status: 200 }
+    );
+
+    // Set Cache-Control headers
+    response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=300');
+    // Ensure caching varies per user to prevent serving URLs across users
+    response.headers.set('Vary', 'Cookie');
+
+    return response;
   } catch (error) {
     console.error('Error in /api/images/gallery:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
