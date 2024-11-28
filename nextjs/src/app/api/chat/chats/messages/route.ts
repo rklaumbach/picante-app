@@ -1,7 +1,7 @@
-// src/app/api/chat/chats/[chat_id]/messages/route.ts
+// src/app/api/chat/chats/messages/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../../../lib/supabaseAdminClient';
+import { supabaseAdmin } from '../../../../../lib/supabaseAdminClient';
 import { getToken } from 'next-auth/jwt';
 
 interface ChatJob {
@@ -16,31 +16,14 @@ interface ChatResponse {
   history: { role: string; content: string }[];
 }
 
-const sendToModalChat = async (job: ChatJob): Promise<ChatResponse> => {
-  const response = await fetch(process.env.MODAL_CHAT_API_URL as string, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Add any necessary authentication headers here
-    },
-    body: JSON.stringify(job),
-  });
+export async function GET(req: NextRequest) {
+  // Extract 'chat_id' from query parameters
+  const { searchParams } = req.nextUrl;
+  const chat_id = searchParams.get('chat_id');
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Failed to communicate with Modal Chat Service.');
+  if (!chat_id) {
+    return NextResponse.json({ error: 'chat_id is required as a query parameter.' }, { status: 400 });
   }
-
-  const data: ChatResponse = await response.json();
-  return data;
-};
-
-
-export async function GET(
-  req: NextRequest,
-  context: { params: { chat_id: string }; searchParams: URLSearchParams }
-) {
-  const { chat_id } = context.params;
 
   try {
     // Authenticate the user
@@ -78,18 +61,19 @@ export async function GET(
 
     return NextResponse.json({ messages: data }, { status: 200 });
   } catch (error) {
-    console.error('Error in GET /api/chat/chats/[chat_id]/messages:', error);
+    console.error('Error in GET /api/chat/chats/messages:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
-// src/app/api/chat/chats/[chat_id]/messages/route.ts
+export async function POST(req: NextRequest) {
+  // Extract 'chat_id' from query parameters
+  const { searchParams } = req.nextUrl;
+  const chat_id = searchParams.get('chat_id');
 
-export async function POST(
-  req: NextRequest,
-  context: { params: { chat_id: string }; searchParams: URLSearchParams }
-) {
-  const { chat_id } = context.params;
+  if (!chat_id) {
+    return NextResponse.json({ error: 'chat_id is required as a query parameter.' }, { status: 400 });
+  }
 
   try {
     // Authenticate the user
@@ -199,7 +183,27 @@ export async function POST(
     // Return the assistant's response to the frontend
     return NextResponse.json({ assistant: assistantMessage }, { status: 200 });
   } catch (error) {
-    console.error('Error in POST /api/chat/chats/[chat_id]/messages:', error);
+    console.error('Error in POST /api/chat/chats/messages:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+// Helper function to communicate with Modal Chat Service
+const sendToModalChat = async (job: ChatJob): Promise<ChatResponse> => {
+  const response = await fetch(process.env.MODAL_CHAT_API_URL as string, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      // Add any necessary authentication headers here
+    },
+    body: JSON.stringify(job),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to communicate with Modal Chat Service.');
+  }
+
+  const data: ChatResponse = await response.json();
+  return data;
+};

@@ -24,9 +24,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId }) => {
   };
 
   // Fetch messages
-  const fetchMessages = async () => {
+  const fetchMessages = async (chat_id: string) => {
     try {
-      const response = await fetch(`/api/chat/chats/${chatId}/messages`, {
+      const response = await fetch(`/api/chat/chats/messages?chat_id=${encodeURIComponent(chat_id)}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -46,7 +46,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId }) => {
   };
 
   useEffect(() => {
-    fetchMessages();
+    fetchMessages(chatId);
 
     const channelName = `chat-${chatId}`;
 
@@ -75,16 +75,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId }) => {
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
-
+  
     setIsSending(true);
-
+  
     try {
-      const response = await fetch(`/api/chat/chats/${chatId}/messages`, {
+      const response = await fetch(`/api/chat/chats/messages?chat_id=${encodeURIComponent(chatId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: 'user', content: input.trim() }),
       });
-
+  
       if (response.ok) {
         const data = await response.json();
         // The assistant's response will be automatically added via real-time subscription
