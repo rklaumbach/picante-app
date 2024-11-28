@@ -2,7 +2,4 @@ backend/node_modules
 frontend/node_modules
 directory_dump.txt
 machine_learning/picante_ml_venv_py310
-machine_learning/np
-machine_learning/torch
-machine_learning/app/models
 *.pyc

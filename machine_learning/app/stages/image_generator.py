@@ -36,7 +36,7 @@ class ImageGenerator:
             return self.pipe
 
         try:
-            model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+            model_file = "/models/sdxl/ponyRealism_v22MainVAE.safetensors"
 
             if pipeline_type == 'txt2img':
                 pipe = StableDiffusionXLPipeline.from_single_file(

@@ -484,7 +484,7 @@ class RealESRGAN:
         )
 
         # Load model weights
-        model_path = f'/app/models/RealESRGAN_x{self.scale}.pth'
+        model_path = f'/models/RealESRGAN_x{self.scale}.pth'
         self.load_weights(model_path)
 
     def load_weights(self, model_path):

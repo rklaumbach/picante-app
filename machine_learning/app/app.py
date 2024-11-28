@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from diffusers import ControlNetModel, StableDiffusionXLPipeline, StableDiffusionXLControlNetInpaintPipeline
 from workflows import Txt2ImgFaceDetailUpscaleWorkflow, Img2ImgFaceDetailUpscaleWorkflow
 import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -113,6 +114,23 @@ class JobStatusResponse(BaseModel):
     image_urls: Optional[Dict[str, str]] = None
     reason: Optional[str] = None
 
+
+# Define Pydantic Models for Chat with History
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+class ChatRequest(BaseModel):
+    prompt: str
+    history: Optional[List[ChatMessage]] = []
+    max_length: int = 100
+    temperature: float = 0.7
+
+class ChatResponse(BaseModel):
+    response: str
+    history: List[ChatMessage]
+
+
 @app.cls(
     gpu="A100",
     secrets=[supabase],
@@ -203,8 +221,6 @@ class Txt2ImgService:
             logger.exception("Error in /job-status:")
             raise HTTPException(status_code=500, detail="Internal Server Error")
     
-    #@modal.web_endpoint(method="POST")
-    #@modal.method()
     async def generate_txt2img(self, request: Txt2ImgRequest):
         """
         Endpoint to submit a Txt2Img image generation job.
@@ -344,7 +360,108 @@ class Txt2ImgService:
                 job_results[job_id] = job_info
                 return {'status': 'failed', 'reason': str(e)}
 
+@app.cls(
+    gpu="A100",
+    container_idle_timeout=60,
+)
+class ChatService:
+    def __init__(self):
+        self.fastapi_app = FastAPI(title="Mistral Chat API")
+        self.fastapi_app.post("/chat")(self.generate_chat)
+        self.lock = threading.Lock()
+
+    @modal.enter()
+    def initialize_model(self):
+        self.tokenizer, self.model = self.initialize_chat_model()
+
+    def initialize_chat_model(self):
+        MODELS_DIR = "/app/models/chat"
+        MODEL_NAME = "/app/models/chat/Moistral-11B-v3"  # Replace with your model's path
+        MODEL_REVISION = "main"  # Replace with the specific revision if needed
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            MODEL_NAME,
+            revision=MODEL_REVISION,
+            cache_dir=MODELS_DIR
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL_NAME,
+            revision=MODEL_REVISION,
+            cache_dir=MODELS_DIR,
+            torch_dtype=torch.float16,  # Adjust based on your model
+            device_map="auto"
+        ).to('cuda')
+
+        return tokenizer, model
+
+    @modal.method()
+    def process_chat(self, job: Dict):
+        """
+        Modal Function to handle chat requests with history.
+        """
+        try:
+            prompt = job.get('prompt', '')
+            history = job.get('history', [])
+            max_length = job.get('max_length', 100)
+            temperature = job.get('temperature', 0.7)
+
+            # Construct the conversation history into the prompt
+            conversation = ""
+            for message in history:
+                role = message.get('role', 'user')
+                content = message.get('content', '')
+                conversation += f"{role.capitalize()}: {content}\n"
+            conversation += f"User: {prompt}\nAssistant:"
+
+            inputs = self.tokenizer.encode(conversation, return_tensors="pt").to(self.model.device)
+            outputs = self.model.generate(
+                inputs,
+                max_length=inputs.shape[1] + max_length,
+                temperature=temperature,
+                do_sample=True,
+                top_p=0.95,
+                top_k=50,
+                pad_token_id=self.tokenizer.eos_token_id  # To prevent warnings if needed
+            )
+            response_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+            # Extract the assistant's reply
+            assistant_reply = response_text[len(conversation):].strip()
+
+            # Update the history with the new message
+            new_history = history.copy()
+            new_history.append({"role": "user", "content": prompt})
+            new_history.append({"role": "assistant", "content": assistant_reply})
+
+            return {'response': assistant_reply, 'history': new_history}
+        except Exception as e:
+            logger.exception("Error in chat_endpoint with history:")
+            raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+    # Integrate chat routes into the existing FastAPI app with history
+    async def generate_chat(self, request: ChatRequest):
+        """
+        Endpoint to handle chat requests with history.
+        """
+        # Prepare parameters
+        params = {
+            'prompt': request.prompt,
+            'history': [message.dict() for message in request.history],
+            'max_length': request.max_length,
+            'temperature': request.temperature
+        }
+
+        # Enqueue the chat job
+        task = self.process_chat.spawn(params)
+
+        # Wait for the task to complete and get the result
+        result = task.result()
+
+        return ChatResponse(response=result['response'], history=result['history'])
+
+
 txt2img_service = Txt2ImgService()
+chat_service = ChatService()
 
 
 # Initialize Supabase client using Modal secrets
@@ -413,48 +530,6 @@ def upload_image_to_supabase(image_bytes: bytes, user_id: str, filename: str) ->
     except Exception as e:
         logger.exception("Failed to upload image to Supabase Storage:")
         raise
-
-# Define FastAPI routes
-# @fastapi_app.post("/generate-txt2img", response_model=ImgResponse)
-# async def generate_txt2img(request: Txt2ImgRequest):
-#     """
-#     Endpoint to submit a Txt2Img image generation job.
-#     """
-
-#     # Create a unique job ID and timestamp
-#     job_id = str(uuid4())
-#     timestamp = datetime.now(timezone.utc).isoformat()
-
-#     # Prepare parameters
-#     params = {
-#         'job_id': job_id,
-#         'user_id': request.user_id,  # Include user_id
-#         'steps': request.steps,
-#         'upscale_enabled': request.upscale_enabled,
-#         'timestamp': timestamp,  # Actual timestamp
-#         'image_prompt': request.image_prompt,
-#         'negative_prompt': request.negative_prompt,
-#         'face_prompt': request.face_prompt,
-#         'face_negative_prompt': request.face_negative_prompt,
-#         'height': request.height,
-#         'width': request.width,
-#         'device': 'cuda',  # Or make this configurable
-#         'scaling': request.scaling
-#     }
-
-#     # Enqueue the method call using the singleton instance
-#     task = txt2img_service.process_txt2img.submit(params)
-
-#     # Store the task Future and initial status with timestamp
-#     job_results[job_id] = {
-#         'task_future': task,
-#         'status': 'queued',
-#         'image_urls': {},
-#         'timestamp': timestamp
-#     }
-
-#     return ImgResponse(job_id=job_id, status='queued')
-
 
 #@fastapi_app.post("/generate-img2img", response_model=ImgResponse)
 async def generate_img2img(
@@ -563,113 +638,6 @@ def get_job_status(job_id: str):
         response['reason'] = job.get('reason', 'Unknown error.')
 
     return response
-
-
-# Define Modal Functions for processing jobs
-
-# Function to process Txt2Img jobs
-# @app.function(gpu="A100", secrets=[supabase])
-# def process_txt2img(job: Dict):
-#     """
-#     Modal Function to process Txt2Img image generation jobs.
-#     """
-
-#     try:
-#         # Get the singleton instance
-
-#         # Access the pipelines
-#         txt2img_pipeline = pipeline_holder.txt2img_pipeline
-#         face_detailer_pipeline = pipeline_holder.face_detailer_pipeline
-#     except Exception as e:
-#         logger.exception("Failed to initialize pipelines")
-
-#     try:
-#         supabase_admin = get_supabase_client()
-#         workflow = Txt2ImgFaceDetailUpscaleWorkflow(
-#             device=job.get('device', 'cuda'),
-#             steps=job.get('steps', 'all'),
-#             upscale_enabled=job.get('upscale_enabled', True),
-#             timestamp=job.get('timestamp'),
-#             image_prompt=job.get('image_prompt', ""),
-#             negative_prompt=job.get('negative_prompt'),
-#             face_prompt=job.get('face_prompt', ""),
-#             face_negative_prompt=job.get('face_negative_prompt', ""),
-#             height=job.get('height', 1024),
-#             width=job.get('width', 1024),
-#             scaling=job.get('scaling'),
-#             txt2img_pipeline=txt2img_pipeline,
-#             face_detailer_pipeline=face_detailer_pipeline
-#         )
-
-#         logger.info(f"Scaling in process_txt2img = {job.get('scaling')}")
-        
-#         images_dict = workflow.run()
-        
-#         if images_dict and 'final_image' in images_dict:
-#             user_id = job.get('user_id')  # Ensure user_id is part of the job data
-#             if not user_id:
-#                 raise Exception("User ID not provided in job data.")
-            
-#             final_image = images_dict['final_image']
-            
-#             # Convert PIL Image to bytes
-#             img_byte_arr = BytesIO()
-#             final_image.save(img_byte_arr, format='PNG')
-#             img_bytes = img_byte_arr.getvalue()
-
-#             # Define a unique filename, e.g., using timestamp
-#             filename = f"{job['timestamp']}_final.png"
-
-#             # Upload to Supabase Storage
-#             image_url = upload_image_to_supabase(img_bytes, user_id, filename)
-
-#             upscaled_width = job.get('width')*job.get('scaling') if job.get('upscale_enabled') else job.get('width')
-#             upscaled_height = job.get('height')*job.get('scaling') if job.get('upscale_enabled') else job.get('height')
-
-#             # Insert into 'images' table with proper timestamp
-#             supabase_admin.from_("images").insert({
-#                 "user_id": user_id,
-#                 "image_path": f"{user_id}/{filename}",
-#                 "filename": filename,
-#                 "body_prompt": job.get('image_prompt', ''),
-#                 "face_prompt": job.get('face_prompt', ''),
-#                 "width": upscaled_width,
-#                 "height": upscaled_height,
-#                 "created_at": job.get('timestamp')  # Actual timestamp
-#             }).execute()
-
-#             # Update job status
-#             job_info = job_results.get(job.get('job_id'))
-#             if not job_info:
-#                 logger.error(f"Job ID {job.get('job_id')} not found in job_results.")
-#                 raise Exception("Job ID not found in job_results.")
-            
-#             job_info['status'] = 'completed'
-#             job_info['image_urls'] = {'final_image': image_url}
-#             job_results[job.get('job_id')] = job_info
-
-#             logger.info(f"Job {job.get('job_id')} completed successfully.")
-#             return {'status': 'completed',
-#                     'image_urls': {'final_image': image_url},
-#                     'width': job.get('width')*job.get('scaling'),
-#                     'height': job.get('height')*job.get('scaling')}
-#         else:
-#             # Update job status to failed
-#             job_info = job_results.get(job.get('job_id'))
-#             job_info['status'] = 'failed'
-#             job_info['reason'] = 'Image generation failed.'
-#             job_results[job.get('job_id')] = job_info
-#             logger.error(f"Job {job.get('job_id')} failed: Image generation failed.")
-#             return {'status': 'failed', 'reason': 'Image generation failed.'}
-#     except Exception as e:
-#         # Update job status to failed with reason
-#         logger.exception("Error processing Txt2Img job:")
-#         job_id = job.get('job_id', 'unknown')
-#         job_info = job_results.get(job_id, {})
-#         job_info['status'] = 'failed'
-#         job_info['reason'] = str(e)
-#         job_results[job_id] = job_info
-#         return {'status': 'failed', 'reason': str(e)}
 
 # Function to process Img2Img jobs
 @app.function(gpu="A100", secrets=[supabase])
@@ -795,38 +763,13 @@ def list_nvrtc_libraries():
                 nvrtc_paths.append(os.path.join(root, file))
     return {"nvrtc_paths": nvrtc_paths}
 
-# Define FastAPI route for job status using query parameters
-#@fastapi_app.get("/job-status", response_model=JobStatusResponse)
-async def get_job_status_endpoint(job_id: str = Query(...)):
-    """
-    Endpoint to check the status of a submitted job.
-    Expects 'job_id' as a query parameter.
-    """
-    try:
-        logger.info(f"GET /job-status called with job_id: {job_id}")
-
-        job = job_results.get(job_id)
-        if not job:
-            logger.warning(f"Job ID {job_id} not found.")
-            raise HTTPException(status_code=404, detail="Job ID not found.")
-        
-        status = job.get('status', 'unknown')
-        response = {'status': status}
-        
-        if status == 'completed':
-            response['image_urls'] = job.get('image_urls', {})
-            response['width'] = job.get('width')
-            response['height'] = job.get('height')
-        elif status == 'failed':
-            response['reason'] = job.get('reason', 'Unknown error.')
-        
-        return JobStatusResponse(**response)
-    except Exception as e:
-        logger.exception("Error in /job-status:")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-
 # Define Modal Function to serve FastAPI app
 @app.function()
 @asgi_app()
-def serve_fastapi():
+def serve_txt2img_fastapi():
     return txt2img_service.fastapi_app
+
+@app.function()
+@asgi_app()
+def serve_chat_fastapi():
+    return chat_service.fastapi_app

@@ -64,7 +64,7 @@ class FaceDetailer:
 
         # Initialize YOLO with fixed model path
         try:
-            self.yolo = YOLO("/app/models/face_yolov8m.pt").to(self.device)
+            self.yolo = YOLO("/models/face_yolov8m.pt").to(self.device)
             logger.info("YOLO model loaded successfully for face detection.")
         except Exception as e:
             logger.error(f"Error loading YOLO model: {e}")
@@ -89,7 +89,7 @@ class FaceDetailer:
         Initialize the inpainting pipeline using ControlNet compatible with SDXL.
         """
         try:
-            controlnet_model_path="/app/models/controlnet/openpose"
+            controlnet_model_path="/models/controlnet/openpose"
 
             # Load SDXL-compatible ControlNet model from local files
             controlnet = ControlNetModel.from_pretrained(
@@ -99,7 +99,7 @@ class FaceDetailer:
             ).to(self.device)
 
             # Load the face detailing model components
-            model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+            model_file = "/models/sdxl/ponyRealism_v22MainVAE.safetensors"
 
             # Load the pipeline
             self.pipe = StableDiffusionXLControlNetInpaintPipeline.from_single_file(

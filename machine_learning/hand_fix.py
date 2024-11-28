@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""
+hand_detailer.py
+
+A script to detect, extract landmarks, and enhance/fix hands in images using YOLO, MediaPipe, and ControlNet.
+"""
+
 from datetime import datetime
 import mediapipe as mp
 from diffusers import (
@@ -13,7 +20,9 @@ from PIL import Image, ImageDraw, ImageFilter
 import cv2
 from torch import autocast
 from ultralytics import YOLO
-
+import argparse
+import os
+import sys
 
 def truncate_prompt(prompt, tokenizer, max_length=77):
     """
@@ -42,10 +51,22 @@ class HandDetailer:
         height=1024,
         width=1024,
         padding_ratio=0.2,
-        timestamp=None
+        timestamp=None,
+        yolo_model_path="models/hand_yolov8m.pt",
+        inpaint_model_path="models/sdxl/handRealism_v22MainVAE.safetensors"
     ):
         """
         Initialize the HandDetailer using MediaPipe Hands, ControlNet, and inpainting.
+        
+        Args:
+            device (str): Device to run the models on ('cuda' or 'cpu').
+            blur_radius (int): Radius for Gaussian blur on masks.
+            height (int): Height for processing images.
+            width (int): Width for processing images.
+            padding_ratio (float): Ratio for padding around detected hands.
+            timestamp (str): Timestamp for logging and debugging.
+            yolo_model_path (str): Path to the YOLO hand detection model.
+            inpaint_model_path (str): Path to the ControlNet inpainting model.
         """
         self.device = device
         self.blur_radius = blur_radius
@@ -56,51 +77,67 @@ class HandDetailer:
         
         # Initialize YOLO with fixed model path for hand detection
         try:
-            self.yolo = YOLO("/app/models/hand_yolov8s.pt").to(self.device)
+            if not os.path.exists(yolo_model_path):
+                logger.error(f"YOLO model not found at {yolo_model_path}. Please check the path.")
+                sys.exit(1)
+            self.yolo = YOLO(yolo_model_path).to(self.device)
             logger.info("YOLO model loaded successfully for hand detection.")
         except Exception as e:
             logger.error(f"Error loading YOLO model: {e}")
-            raise
+            sys.exit(1)
 
         # Initialize MediaPipe Hands
         try:
             self.mp_hands = mp.solutions.hands
             self.hands = self.mp_hands.Hands(
                 static_image_mode=True,
-                max_num_hands=2,
+                max_num_hands=5,
                 min_detection_confidence=0.7
             )
             logger.info("MediaPipe Hands initialized successfully.")
         except Exception as e:
             logger.error(f"Error initializing MediaPipe Hands: {e}")
-            raise
+            sys.exit(1)
 
         self.tokenizer = None  # Will be set when initializing the pipeline
         self.pipe = None
+        self.inpaint_model_path = inpaint_model_path
 
     def initialize_pipeline(self):
         """
         Initialize the inpainting pipeline using ControlNet compatible with SDXL, using a model for hand detailing.
+        
+        Returns:
+            StableDiffusionXLControlNetInpaintPipeline: The initialized inpainting pipeline.
         """
         try:
+            controlnet_model_path="app/models/controlnet/openpose"
             # Load SDXL-compatible ControlNet model for hands
             controlnet = ControlNetModel.from_pretrained(
-                "thibaud/controlnet-openpose-sdxl-1.0",  # Ensure this model exists or replace with appropriate
+                controlnet_model_path,  # Replace with actual ControlNet model name for hands
                 torch_dtype=torch.float16,
                 use_safetensors=False
             ).to(self.device)
 
             # Load the hand detailing model components from a pre-trained file
-            model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"  # Update path as needed
+            if not os.path.exists(self.inpaint_model_path):
+                logger.error(f"ControlNet model not found at {self.inpaint_model_path}. Please check the path.")
+                sys.exit(1)
 
             # Load the inpainting pipeline
             pipe = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
-                model_file,
+                self.inpaint_model_path,
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
                 variant="fp16",
                 use_safetensors=True,
             ).to(self.device)
+
+                    # Load LoRA weights
+            lora_path = "hand_models/hand 5.5.safetensors"  # Remote path
+            #pipe.load_lora_weights(lora_path, weight_name="NSFW_master.safetensors", adapter_name="nsfw_master")
+            pipe.load_lora_weights(lora_path, weight_name="hand 5.5.safetensors", adapter_name="hand")
+            pipe.set_adapters("hand", adapter_weights=[0.8])
 
             pipe.enable_xformers_memory_efficient_attention()
             self.tokenizer = pipe.tokenizer
@@ -113,7 +150,7 @@ class HandDetailer:
             return pipe
         except Exception as e:
             logger.error(f"Error initializing inpaint pipeline: {e}")
-            raise
+            sys.exit(1)
 
     def match_skin_tones(self, source_image, target_image, mask):
         """
@@ -174,8 +211,9 @@ class HandDetailer:
     def enhance_hands(
         self,
         image,
-        hand_prompt="hand",
-        hand_negative_prompt="bad_hands, missing_finger"
+        hand_prompt="highres, absurdres, photorealistic, hands",
+        hand_negative_prompt="bad_hands, extra_hands, bad_anatomy, extra_digits, missing_fingers",
+        debug=True
     ):
         """
         Enhance or fix hands in the provided image using YOLO, MediaPipe Hands, and ControlNet inpainting.
@@ -220,8 +258,9 @@ class HandDetailer:
             # Perform hand detection using YOLOv8
             detections = self.yolo(img_np)  # YOLOv8 inference
 
-            # Filter detections for hands (assuming YOLOv8's 'hand' class is known, adjust as necessary)
+            # Filter detections for hands
             # You might need to adjust the class index based on the YOLO model's classes
+            # For example, if 'hand' is class 0 in your model
             hand_class_index = 0  # Replace with the correct class index if different
             hand_detections = [det for det in detections[0].boxes if det.cls == hand_class_index]
 
@@ -237,6 +276,20 @@ class HandDetailer:
 
             # Create a copy of the original image to paste enhanced hands
             final_image = image.copy()
+
+            # If debug is True, create a debug image with bounding boxes
+            if debug:
+                debug_image = image.copy()
+                draw_debug = ImageDraw.Draw(debug_image)
+                for idx, det in enumerate(hand_detections, start=1):
+                    x1, y1, x2, y2 = map(int, det.xyxy[0].cpu().numpy())
+                    # Draw rectangle
+                    draw_debug.rectangle([(x1, y1), (x2, y2)], outline="red", width=5)
+                # Ensure debug directory exists
+                os.makedirs("debug", exist_ok=True)
+                debug_path = f"debug/detections_{self.timestamp}.png"
+                debug_image.save(debug_path)
+                logger.info(f"Debug image with bounding boxes saved at {debug_path}.")
 
             # Process each detected hand individually
             for idx, det in enumerate(hand_detections, start=1):
@@ -278,6 +331,19 @@ class HandDetailer:
 
                     logger.info(f"Detected landmarks for hand {idx}.")
 
+                    # If debug is True, save an image with landmarks
+                    if debug:
+                        landmarks_image = hand_region.copy()
+                        draw_landmarks = ImageDraw.Draw(landmarks_image)
+                        for landmarks in results.multi_hand_landmarks:
+                            for lm in landmarks.landmark:
+                                landmark_x = int(lm.x * hand_region.width)
+                                landmark_y = int(lm.y * hand_region.height)
+                                draw_landmarks.ellipse((landmark_x - 3, landmark_y - 3, landmark_x + 3, landmark_y + 3), fill='blue')
+                        landmarks_debug_path = f"debug/landmarks_{self.timestamp}_hand{idx}.png"
+                        landmarks_image.save(landmarks_debug_path)
+                        logger.info(f"Landmarks image saved at {landmarks_debug_path}.")
+
                     # Create a precise mask using the detected hand landmarks
                     hand_mask = self.create_precise_mask_with_landmarks(hand_region, results.multi_hand_landmarks)
 
@@ -308,8 +374,9 @@ class HandDetailer:
                             image=hand_region_high_res,
                             mask_image=hand_mask_high_res,
                             control_image=control_image_high_res,
-                            num_inference_steps=30,
+                            num_inference_steps=60,
                             guidance_scale=7.5,
+                            strength=0.5,
                             height=high_res_size[1],
                             width=high_res_size[0]
                         )
@@ -333,19 +400,19 @@ class HandDetailer:
                 logger.info("Cleaned up inpainting pipeline and cleared GPU cache.")
             except Exception as cleanup_e:
                 logger.error(f"Error during cleanup: {cleanup_e}")
-
-            return final_image
-        
         except Exception as e:
-            logger.error(f"Error processing enhance_hands: {e}")
+            logger.error(f"Exception in enhance_hands: {e}")
 
-    def create_precise_mask_with_landmarks(self, image, hand_landmarks):
+        return final_image
+
+    def create_precise_mask_with_landmarks(self, image, hand_landmarks, blur_radius=5):
         """
         Create a precise binary mask using the convex hull of all hand landmarks.
         
         Args:
             image (PIL.Image.Image): The cropped hand image.
             hand_landmarks (list): List of detected hand landmarks from MediaPipe.
+            blur_radius (int): Radius for Gaussian blur on the mask.
         
         Returns:
             PIL.Image.Image: Binary mask image.
@@ -388,7 +455,7 @@ class HandDetailer:
                 kernel_size = 3
 
             # Create a circular (elliptical) structuring element
-            kernel = cv2.get_structuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
 
             # Apply dilation to expand the mask
             mask_np_dilated = cv2.dilate(mask_np, kernel, iterations=1)
@@ -397,11 +464,102 @@ class HandDetailer:
             mask_dilated = Image.fromarray(mask_np_dilated)
 
             # Apply Gaussian blur for smoother edges
-            if self.blur_radius > 0:
-                mask_dilated = mask_dilated.filter(ImageFilter.GaussianBlur(radius=self.blur_radius))
+            if blur_radius > 0:
+                mask_dilated = mask_dilated.filter(ImageFilter.GaussianBlur(radius=blur_radius))
 
             return mask_dilated
 
         except Exception as e:
             logger.error(f"Error creating precise mask with landmarks: {e}")
             raise
+
+def parse_arguments():
+    """
+    Parse command-line arguments.
+    
+    Returns:
+        argparse.Namespace: Parsed arguments.
+    """
+    parser = argparse.ArgumentParser(description="Enhance hands in an image using YOLO, MediaPipe, and ControlNet.")
+    parser.add_argument(
+        "--input",
+        type=str,
+        required=True,
+        help="Path to the input image."
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        required=True,
+        help="Path to save the enhanced output image."
+    )
+    parser.add_argument(
+        "--yolo_model",
+        type=str,
+        default="app/models/hand_yolov9c.pt",
+        help="Path to the YOLO hand detection model."
+    )
+    parser.add_argument(
+        "--inpaint_model",
+        type=str,
+        default="app/models/sdxl/ponyRealism_v22MainVAE.safetensors",
+        help="Path to the SDXL inpainting model."
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda",
+        choices=["cuda", "cpu"],
+        help="Device to run the models on ('cuda' or 'cpu')."
+    )
+    return parser.parse_args()
+
+def main():
+    """
+    Main function to run the HandDetailer.
+    """
+    args = parse_arguments()
+
+    # Configure logger
+    logger.remove()  # Remove default logger
+    logger.add(sys.stderr, format="{time} {level} {message}", level="INFO")
+
+    # Check if input image exists
+    if not os.path.exists(args.input):
+        logger.error(f"Input image not found at {args.input}.")
+        sys.exit(1)
+
+    # Load the input image
+    try:
+        image = Image.open(args.input).convert("RGB")
+        logger.info(f"Loaded input image from {args.input}.")
+    except Exception as e:
+        logger.error(f"Error loading image {args.input}: {e}")
+        sys.exit(1)
+
+    # Initialize HandDetailer
+    hand_detailer = HandDetailer(
+        device=args.device,
+        blur_radius=5,
+        height=1024,
+        width=1024,
+        padding_ratio=0.2,
+        yolo_model_path=args.yolo_model,
+        inpaint_model_path=args.inpaint_model
+    )
+
+    # Enhance hands in the image
+    try:
+        enhanced_image = hand_detailer.enhance_hands(image)
+        if enhanced_image:
+            # Save the enhanced image
+            enhanced_image.save(args.output)
+            logger.info(f"Enhanced image saved at {args.output}.")
+        else:
+            logger.warning("Enhanced image is None.")
+    except Exception as e:
+        logger.error(f"Failed to enhance hands: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

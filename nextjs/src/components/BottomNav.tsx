@@ -33,6 +33,9 @@ const BottomNav: React.FC = () => {
         <Link href="/gallery" className="text-white">
           Gallery
         </Link>
+        <Link href="/chat" className="text-white">
+          Chat
+        </Link>
         <Link href="/account" className="text-white">
           Account
         </Link>
