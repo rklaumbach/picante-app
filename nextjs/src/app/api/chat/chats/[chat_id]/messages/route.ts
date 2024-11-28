@@ -16,7 +16,7 @@ interface ChatResponse {
   history: { role: string; content: string }[];
 }
 
-export const sendToModalChat = async (job: ChatJob): Promise<ChatResponse> => {
+const sendToModalChat = async (job: ChatJob): Promise<ChatResponse> => {
   const response = await fetch(process.env.MODAL_CHAT_API_URL as string, {
     method: 'POST',
     headers: {
