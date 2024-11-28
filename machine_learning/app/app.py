@@ -157,7 +157,7 @@ class Txt2ImgService:
         self.face_detailer_pipeline = self.initialize_face_detailer_pipeline()
         
     def initialize_txt2img_pipeline(self):
-        model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+        model_file = "/models/sdxl/ponyRealism_v22MainVAE.safetensors"
 
         txt2img_pipeline = StableDiffusionXLPipeline.from_single_file(
             model_file,
@@ -175,7 +175,7 @@ class Txt2ImgService:
         return txt2img_pipeline
 
     def initialize_face_detailer_pipeline(self):
-        controlnet_model_path = "/app/models/controlnet/openpose"
+        controlnet_model_path = "/models/controlnet/openpose"
 
         # Load ControlNet model
         controlnet = ControlNetModel.from_pretrained(
@@ -184,7 +184,7 @@ class Txt2ImgService:
             use_safetensors=False  # Assuming .safetensors files
         )#.to('cuda')
 
-        model_file = "/app/models/sdxl/ponyRealism_v22MainVAE.safetensors"
+        model_file = "/models/sdxl/ponyRealism_v22MainVAE.safetensors"
 
         face_detailer_pipeline = StableDiffusionXLControlNetInpaintPipeline.from_single_file(
             model_file,
