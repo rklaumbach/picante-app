@@ -36,8 +36,11 @@ const sendToModalChat = async (job: ChatJob): Promise<ChatResponse> => {
 };
 
 
-export async function GET(req: NextRequest, { params }: { params: { chat_id: string } }) {
-  const { chat_id } = params;
+export async function GET(
+  req: NextRequest,
+  context: { params: { chat_id: string }; searchParams: URLSearchParams }
+) {
+  const { chat_id } = context.params;
 
   try {
     // Authenticate the user
@@ -82,8 +85,11 @@ export async function GET(req: NextRequest, { params }: { params: { chat_id: str
 
 // src/app/api/chat/chats/[chat_id]/messages/route.ts
 
-export async function POST(req: NextRequest, { params }: { params: { chat_id: string } }) {
-  const { chat_id } = params;
+export async function POST(
+  req: NextRequest,
+  context: { params: { chat_id: string }; searchParams: URLSearchParams }
+) {
+  const { chat_id } = context.params;
 
   try {
     // Authenticate the user
