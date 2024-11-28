@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       chats.map(async (chat) => {
         if (chat.characters && chat.characters.image_path) {
           const { data: signedData, error: urlError } = await supabaseAdmin.storage
-            .from('characters') // Ensure this matches your storage bucket name
+            .from('user-images') // Ensure this matches your storage bucket name
             .createSignedUrl(chat.characters.image_path, 60*60); // URL valid for 60 seconds
 
           if (urlError) {
