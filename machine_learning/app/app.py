@@ -75,6 +75,9 @@ image_job_queue = Queue.from_name("image-job-queue", create_if_missing=True)
 # Define Modal Dict for storing job results
 job_results = ModalDict.from_name("job-results", create_if_missing=True)
 
+model_volume = modal.Volume.from_name("model-volume", create_if_missing=True)
+
+
 # Initialize FastAPI
 fastapi_app = FastAPI(title="Image Processing API")
 
@@ -135,6 +138,7 @@ class ChatResponse(BaseModel):
     gpu="A100",
     secrets=[supabase],
     container_idle_timeout=60,
+    volumes={"/models": model_volume}
 )
 class Txt2ImgService:
     def __init__(self):
@@ -363,6 +367,7 @@ class Txt2ImgService:
 @app.cls(
     gpu="A100",
     container_idle_timeout=60,
+    volumes={"/models": model_volume}
 )
 class ChatService:
     def __init__(self):
@@ -375,8 +380,8 @@ class ChatService:
         self.tokenizer, self.model = self.initialize_chat_model()
 
     def initialize_chat_model(self):
-        MODELS_DIR = "/app/models/chat"
-        MODEL_NAME = "/app/models/chat/Moistral-11B-v3"  # Replace with your model's path
+        MODELS_DIR = "/models/chat"
+        MODEL_NAME = "/models/chat/Moistral-11B-v3"  # Replace with your model's path
         MODEL_REVISION = "main"  # Replace with the specific revision if needed
 
         tokenizer = AutoTokenizer.from_pretrained(
