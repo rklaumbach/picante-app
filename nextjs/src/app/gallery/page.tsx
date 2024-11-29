@@ -129,30 +129,30 @@ const GalleryPage: React.FC = () => {
         });
       }
     };
-
-    useEffect(() => {
-      // Update containerWidth after component mounts
-      const updateContainerWidth = () => {
-        setGridConfig((prev) => ({
-          ...prev,
-          containerWidth: window.innerWidth,
-        }));
-      };
-    
-      updateContainerWidth(); // Set initial width
-    
-      // Optional: Add event listener for window resize
-      window.addEventListener('resize', updateContainerWidth);
-    
-      // Cleanup event listener on unmount
-      return () => {
-        window.removeEventListener('resize', updateContainerWidth);
-      };
-    }, []);
   
     updateGridConfig();
     window.addEventListener('resize', updateGridConfig);
     return () => window.removeEventListener('resize', updateGridConfig);
+  }, []);
+
+  useEffect(() => {
+    // Update containerWidth after component mounts
+    const updateContainerWidth = () => {
+      setGridConfig((prev) => ({
+        ...prev,
+        containerWidth: window.innerWidth,
+      }));
+    };
+  
+    updateContainerWidth(); // Set initial width
+  
+    // Optional: Add event listener for window resize
+    window.addEventListener('resize', updateContainerWidth);
+  
+    // Cleanup event listener on unmount
+    return () => {
+      window.removeEventListener('resize', updateContainerWidth);
+    };
   }, []);
   
   const handleImageClick = (image: ImageData) => {
