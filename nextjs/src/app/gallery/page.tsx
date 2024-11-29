@@ -34,7 +34,7 @@ const GalleryPage: React.FC = () => {
     columnCount: 4,
     columnWidth: 200,
     rowHeight: 200,
-    containerWidth: window.innerWidth,
+    containerWidth: 400,
     containerHeight: 600,
   });
 
@@ -129,6 +129,26 @@ const GalleryPage: React.FC = () => {
         });
       }
     };
+
+    useEffect(() => {
+      // Update containerWidth after component mounts
+      const updateContainerWidth = () => {
+        setGridConfig((prev) => ({
+          ...prev,
+          containerWidth: window.innerWidth,
+        }));
+      };
+    
+      updateContainerWidth(); // Set initial width
+    
+      // Optional: Add event listener for window resize
+      window.addEventListener('resize', updateContainerWidth);
+    
+      // Cleanup event listener on unmount
+      return () => {
+        window.removeEventListener('resize', updateContainerWidth);
+      };
+    }, []);
   
     updateGridConfig();
     window.addEventListener('resize', updateGridConfig);
