@@ -240,8 +240,14 @@ class FaceDetailer:
                             control_image.putpixel((landmark_x, landmark_y), (255, 255, 255))
                     # debug_images[f'face_{idx}_control'] = control_image
 
-                    # Upscale the face region, mask, and control image
-                    upscale_factor = 5  # You can adjust this factor as needed
+                     # **Dynamic Upscale Factor Calculation Starts Here**
+                    max_dimension = max(face_region.width, face_region.height)
+                    # Calculate the maximum possible upscale factor without exceeding 1024 in any dimension
+                    calculated_factor = 1024 // max_dimension
+                    upscale_factor = min(5, max(1, calculated_factor))
+                    logger.info(f"Chosen upscale factor for face {idx}: {upscale_factor}")
+
+                    # Calculate the high-resolution size
                     high_res_size = (face_region.width * upscale_factor, face_region.height * upscale_factor)
                     face_region_high_res = face_region.resize(high_res_size, resample=Image.LANCZOS)
                     face_mask_high_res = face_mask.resize(high_res_size, resample=Image.NEAREST)
