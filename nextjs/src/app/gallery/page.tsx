@@ -13,8 +13,11 @@ import Button from '../../components/Button';
 import { toast } from 'react-toastify';
 import { ImageData } from '@/types/types';
 import Image from 'next/image';
-import CachedImage from '@/components/CachedImage'; // Import the CachedImage component
+import CachedImage from '@/components/CachedImage';
 import { useInView } from 'react-intersection-observer';
+import { FixedSizeGrid } from 'react-window';
+import { debounce } from 'lodash'; 
+
 
 const GalleryPage: React.FC = () => {
   const { data: session, status } = useSession();
@@ -27,48 +30,60 @@ const GalleryPage: React.FC = () => {
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
+  const [gridConfig, setGridConfig] = useState({
+    columnCount: 4,
+    columnWidth: 200,
+    rowHeight: 200,
+    containerWidth: window.innerWidth,
+    containerHeight: 600,
+  });
+
   const { ref, inView } = useInView({
     threshold: 0,
   });
 
-  const fetchImages = useCallback(async () => {
-    if (status !== 'authenticated' || loading || !hasMore) return;
-
-    setLoading(true);
-    try {
-      const url = new URL('/api/images/gallery', window.location.origin);
-      url.searchParams.append('limit', '20');
-      if (nextCursor) {
-        url.searchParams.append('cursor', nextCursor);
-      }
-
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data.images)) {
-          setImages((prev) => [...prev, ...data.images]);
-          setNextCursor(data.nextCursor || null);
-          setHasMore(Boolean(data.nextCursor));
+  const fetchImages = useCallback(
+    debounce(async () => {
+      if (status !== 'authenticated' || loading || !hasMore) return;
+  
+      setLoading(true);
+      try {
+        const url = new URL('/api/images/gallery', window.location.origin);
+        url.searchParams.append('limit', '20');
+        if (nextCursor) {
+          url.searchParams.append('cursor', nextCursor);
+        }
+  
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+  
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data.images)) {
+            setImages((prev) => [...prev, ...data.images]);
+            setNextCursor(data.nextCursor || null);
+            setHasMore(Boolean(data.nextCursor));
+          } else {
+            console.error('Invalid data format for images:', data.images);
+            setHasMore(false);
+          }
         } else {
-          console.error('Invalid data format for images:', data.images);
+          console.error('Failed to fetch images:', response.status, response.statusText);
           setHasMore(false);
         }
-      } else {
-        console.error('Failed to fetch images:', response.status, response.statusText);
+      } catch (error) {
+        console.error('Error fetching images:', error);
         setHasMore(false);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching images:', error);
-      setHasMore(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [status, nextCursor, loading, hasMore]);
+    }, 300),
+    [status, nextCursor, loading, hasMore]
+  );
+  
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -84,6 +99,42 @@ const GalleryPage: React.FC = () => {
     }
   }, [inView, hasMore, loading, fetchImages]);
 
+  useEffect(() => {
+    const updateGridConfig = () => {
+      const width = window.innerWidth;
+  
+      if (width < 640) {
+        setGridConfig({
+          columnCount: 1,
+          columnWidth: width - 16,
+          rowHeight: 200,
+          containerWidth: width,
+          containerHeight: 400,
+        });
+      } else if (width < 1024) {
+        setGridConfig({
+          columnCount: 2,
+          columnWidth: (width - 32) / 2,
+          rowHeight: 250,
+          containerWidth: width,
+          containerHeight: 500,
+        });
+      } else {
+        setGridConfig({
+          columnCount: 4,
+          columnWidth: (width - 64) / 4,
+          rowHeight: 300,
+          containerWidth: width,
+          containerHeight: 600,
+        });
+      }
+    };
+  
+    updateGridConfig();
+    window.addEventListener('resize', updateGridConfig);
+    return () => window.removeEventListener('resize', updateGridConfig);
+  }, []);
+  
   const handleImageClick = (image: ImageData) => {
     setSelectedImage(image);
   };
@@ -188,53 +239,31 @@ const GalleryPage: React.FC = () => {
             {images.length === 0 ? (
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {images.map((image, index) => {
-                  // Attach the ref to the last image for infinite scrolling
-                  if (index === images.length - 1) {
-                    return (
-                      <div
-                        key={image.id}
-                        ref={ref}
-                        className="relative group cursor-pointer overflow-hidden"
-                        onClick={() => handleImageClick(image)}
-                      >
-                        <CachedImage imageData={image} />
-                        <button
-                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the image click
-                            handleDeleteClick(image.id);
-                          }}
-                          aria-label="Delete Image"
-                        >
-                          ✖
-                        </button>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div
-                        key={image.id}
-                        className="relative group cursor-pointer overflow-hidden"
-                        onClick={() => handleImageClick(image)}
-                      >
-                        <CachedImage imageData={image} />
-                        <button
-                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the image click
-                            handleDeleteClick(image.id);
-                          }}
-                          aria-label="Delete Image"
-                        >
-                          ✖
-                        </button>
-                      </div>
-                    );
-                  }
-                })}
-              </div>
+              <FixedSizeGrid
+              columnCount={gridConfig.columnCount}
+              rowCount={Math.ceil(images.length / gridConfig.columnCount)}
+              columnWidth={gridConfig.columnWidth}
+              rowHeight={gridConfig.rowHeight}
+              height={gridConfig.containerHeight}
+              width={gridConfig.containerWidth}
+              >
+                {({ columnIndex, rowIndex, style }) => {
+                  const imageIndex = rowIndex * 4 + columnIndex;
+                  if (imageIndex >= images.length) return null;
+
+                  const image = images[imageIndex];
+                  return (
+                    <div style={style}>
+                      <img
+                        className="rounded-lg transform transition-transform duration-200 hover:scale-105"
+                        src={image.image_url}
+                        alt={image.filename}
+                      />
+                    </div>
+                  );
+                }}
+                </FixedSizeGrid>
+
             )}
             {/* Sentinel for Infinite Scroll */}
             {hasMore && (
@@ -242,6 +271,7 @@ const GalleryPage: React.FC = () => {
                 {loading && <p className="text-center text-gray-500">Loading more images...</p>}
               </div>
             )}
+
           </div>
 
           {/* Image Overlay Modal */}
