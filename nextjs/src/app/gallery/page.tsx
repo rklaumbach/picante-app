@@ -35,7 +35,7 @@ const GalleryPage: React.FC = () => {
     columnWidth: 200,
     rowHeight: 200,
     containerWidth: 400,
-    containerHeight: 600,
+    containerHeight: 1000,
   });
 
   const { ref, inView } = useInView({
@@ -260,12 +260,12 @@ const GalleryPage: React.FC = () => {
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
               <FixedSizeGrid
-              columnCount={gridConfig.columnCount}
-              rowCount={Math.ceil(images.length / gridConfig.columnCount)}
-              columnWidth={gridConfig.columnWidth}
-              rowHeight={gridConfig.rowHeight}
-              height={gridConfig.containerHeight}
-              width={gridConfig.containerWidth}
+              columnCount={4} // Adjust based on your desired number of columns
+              rowCount={Math.ceil(images.length / 4)} // Calculate the rows
+              columnWidth={200} // Adjust based on your design
+              rowHeight={200} // Set height of each row
+              height={600} // Container height
+              width={800} // Container width
               >
                 {({ columnIndex, rowIndex, style }) => {
                   const imageIndex = rowIndex * 4 + columnIndex;
