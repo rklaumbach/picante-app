@@ -126,13 +126,15 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     prompt: str
     history: Optional[List[ChatMessage]] = []
+    personality: Optional[str] = None
+    context: Optional[str] = None
+    other_info: Optional[str] = None
     max_length: int = 100
     temperature: float = 0.7
 
 class ChatResponse(BaseModel):
     response: str
     history: List[ChatMessage]
-
 
 @app.cls(
     gpu="A100",
@@ -402,22 +404,24 @@ class ChatService:
     @modal.method()
     def process_chat(self, job: Dict):
         """
-        Modal Function to handle chat requests with history.
+        Modal Function to handle chat requests with history and system prompts.
         """
         try:
             prompt = job.get('prompt', '')
             history = job.get('history', [])
+            system_prompt = job.get('system_prompt', '')
             max_length = job.get('max_length', 100)
             temperature = job.get('temperature', 0.7)
 
-            # Construct the conversation history into the prompt
-            conversation = ""
+            # Construct the conversation by combining system prompt and user history
+            conversation = system_prompt  # Start with system prompt
             for message in history:
                 role = message.get('role', 'user')
                 content = message.get('content', '')
                 conversation += f"{role.capitalize()}: {content}\n"
             conversation += f"User: {prompt}\nAssistant:"
 
+            # Tokenize and generate response
             inputs = self.tokenizer.encode(conversation, return_tensors="pt").to(self.model.device)
             outputs = self.model.generate(
                 inputs,
@@ -440,29 +444,60 @@ class ChatService:
 
             return {'response': assistant_reply, 'history': new_history}
         except Exception as e:
-            logger.exception("Error in chat_endpoint with history:")
-            raise HTTPException(status_code=500, detail="Internal Server Error")
+            logger.exception("Error processing Chat job:")
+            job_id = job.get('job_id', 'unknown')
+            job_info = job_results.get(job_id, {})
+            job_info['status'] = 'failed'
+            job_info['reason'] = str(e)
+            job_results[job_id] = job_info
+            return {'status': 'failed', 'reason': str(e)}
     
     # Integrate chat routes into the existing FastAPI app with history
     async def generate_chat(self, request: ChatRequest):
         """
-        Endpoint to handle chat requests with history.
+        Endpoint to handle chat requests with history and system prompts.
         """
-        # Prepare parameters
+        # Construct the system prompt based on provided fields
+        system_prompt = "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.\n\n### Instruction:\n"
+        
+        if any([request.personality, request.context, request.other_info]):
+            system_prompt += "You will engage in sexual, erotic, and/or romantic roleplay with the user. "
+            if request.personality:
+                system_prompt += f"You have the following personality traits: {request.personality}. "
+            if request.context:
+                system_prompt += f"The scenario context is: {request.context}. "
+            if request.other_info:
+                system_prompt += f"Additional information: {request.other_info}. "
+            system_prompt += "You will behave according to the user's specified instructions. You will respond once, and only once, each time the user interacts with you.\n\n### Response:\n"
+        
+        # Prepare parameters without including the system prompt in history
         params = {
+            'job_id': str(uuid4()),
             'prompt': request.prompt,
             'history': [message.dict() for message in request.history],
+            'system_prompt': system_prompt,  # Pass the system prompt separately
             'max_length': request.max_length,
             'temperature': request.temperature
         }
 
         # Enqueue the chat job
-        task = self.process_chat.spawn(params)
+        task = chat_service.process_chat.spawn(params)
+
+        # Store the task ID and initial status with timestamp
+        job_results[params['job_id']] = {
+            'modal_task_id': task.object_id,
+            'status': 'queued',
+            'image_urls': {},
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
 
         # Wait for the task to complete and get the result
-        result = task.result()
+        result = task.get()
 
-        return ChatResponse(response=result['response'], history=result['history'])
+        if result.get('status') == 'failed':
+            return ChatResponse(response="Error processing chat.", history=request.history)
+
+        return ChatResponse(response=result.get('response', ''), history=result.get('history', request.history))
 
 
 txt2img_service = Txt2ImgService()
