@@ -106,44 +106,47 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
       toast.error('Name and image are required.');
       return;
     }
-
+  
     try {
       const response = await fetch('/api/chat/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCharacter),
       });
-
+  
       if (response.ok) {
         const data = await response.json();
         const createdCharacter: Character = data.character;
-
+  
+        // Check if character and image_id are present
+        if (!createdCharacter || !createdCharacter.image_id) {
+          console.error('Character data is missing after creation:', data);
+          toast.error('Failed to retrieve character data.');
+          return;
+        }
+  
         // Fetch signed URL for the newly created character
-        if (createdCharacter.image_id) {
-          try {
-            const signedUrlResponse = await fetch('/api/images/refresh-signed-url', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ imageId: createdCharacter.image_id }),
-            });
-
-            if (signedUrlResponse.ok) {
-              const { newSignedUrl } = await signedUrlResponse.json();
-              createdCharacter.signed_image_url = newSignedUrl;
-            } else {
-              console.error(`Failed to fetch signed URL for new character ID ${createdCharacter.id}:`, signedUrlResponse.statusText);
-              createdCharacter.signed_image_url = '/default-avatar.png'; // Fallback image
-            }
-          } catch (error) {
-            console.error(`Error fetching signed URL for new character ID ${createdCharacter.id}:`, error);
+        try {
+          const signedUrlResponse = await fetch('/api/images/refresh-signed-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageId: createdCharacter.image_id }),
+          });
+  
+          if (signedUrlResponse.ok) {
+            const { newSignedUrl } = await signedUrlResponse.json();
+            createdCharacter.signed_image_url = newSignedUrl;
+          } else {
+            console.error(`Failed to fetch signed URL for character ID ${createdCharacter.id}:`, signedUrlResponse.statusText);
             createdCharacter.signed_image_url = '/default-avatar.png'; // Fallback image
           }
-        } else {
-          console.warn(`New character ID ${createdCharacter.id} does not have an associated image_id.`);
+        } catch (error) {
+          console.error(`Error fetching signed URL for character ID ${createdCharacter.id}:`, error);
           createdCharacter.signed_image_url = '/default-avatar.png'; // Fallback image
         }
-
-        setCharacters([...characters, createdCharacter]);
+  
+        // Update the state to include the new character
+        setCharacters((prevCharacters) => [...prevCharacters, createdCharacter]);
         setIsDialogOpen(false);
         setNewCharacter({
           name: '',
@@ -154,6 +157,7 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
         toast.success('Character created successfully!');
       } else {
         const errorData = await response.json();
+        console.error('Failed to create character:', errorData);
         toast.error(errorData.error || 'Failed to create character.');
       }
     } catch (error) {
