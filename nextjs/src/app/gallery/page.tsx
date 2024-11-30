@@ -27,14 +27,6 @@ const GalleryPage: React.FC = () => {
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  const [gridConfig, setGridConfig] = useState({
-    columnCount: 4,
-    columnWidth: 200,
-    rowHeight: 200,
-    containerWidth: window.innerWidth,
-    containerHeight: 600,
-  });
-
   const { ref, inView } = useInView({
     threshold: 0,
   });
@@ -196,31 +188,53 @@ const GalleryPage: React.FC = () => {
             {images.length === 0 ? (
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
-              <FixedSizeGrid
-              columnCount={gridConfig.columnCount}
-              rowCount={Math.ceil(images.length / gridConfig.columnCount)}
-              columnWidth={gridConfig.columnWidth}
-              rowHeight={gridConfig.rowHeight}
-              height={gridConfig.containerHeight}
-              width={gridConfig.containerWidth}
-              >
-                {({ columnIndex, rowIndex, style }) => {
-                  const imageIndex = rowIndex * 4 + columnIndex;
-                  if (imageIndex >= images.length) return null;
-
-                  const image = images[imageIndex];
-                  return (
-                    <div style={style}>
-                      <img
-                        className="rounded-lg transform transition-transform duration-200 hover:scale-105"
-                        src={image.image_url}
-                        alt={image.filename}
-                      />
-                    </div>
-                  );
-                }}
-                </FixedSizeGrid>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {images.map((image, index) => {
+                  // Attach the ref to the last image for infinite scrolling
+                  if (index === images.length - 1) {
+                    return (
+                      <div
+                        key={image.id}
+                        ref={ref}
+                        className="relative group cursor-pointer overflow-hidden"
+                        onClick={() => handleImageClick(image)}
+                      >
+                        <CachedImage imageData={image} />
+                        <button
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent triggering the image click
+                            handleDeleteClick(image.id);
+                          }}
+                          aria-label="Delete Image"
+                        >
+                          ✖
+                        </button>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div
+                        key={image.id}
+                        className="relative group cursor-pointer overflow-hidden"
+                        onClick={() => handleImageClick(image)}
+                      >
+                        <CachedImage imageData={image} />
+                        <button
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent triggering the image click
+                            handleDeleteClick(image.id);
+                          }}
+                          aria-label="Delete Image"
+                        >
+                          ✖
+                        </button>
+                      </div>
+                    );
+                  }
+                })}
+              </div>
             )}
             {/* Sentinel for Infinite Scroll */}
             {hasMore && (
