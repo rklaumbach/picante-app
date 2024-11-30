@@ -180,3 +180,53 @@ const sendToModalChat = async (job: ChatJob): Promise<ChatResponse> => {
   const data: ChatResponse = await response.json();
   return data;
 };
+
+export async function GET(req: NextRequest) {
+  // Extract 'chat_id' from query parameters
+  const { searchParams } = req.nextUrl;
+  const chat_id = searchParams.get('chat_id');
+
+  if (!chat_id) {
+    return NextResponse.json({ error: 'chat_id is required as a query parameter.' }, { status: 400 });
+  }
+
+  try {
+    // Authenticate the user
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = token.sub as string;
+
+    // Verify that the chat belongs to the user
+    const { data: chatData, error: chatError } = await supabaseAdmin
+      .from('chats')
+      .select('id')
+      .eq('id', chat_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (chatError || !chatData) {
+      console.error('Error fetching chat:', chatError);
+      return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
+    }
+
+    // Fetch messages for the chat
+    const { data, error } = await supabaseAdmin
+      .from('messages')
+      .select('*')
+      .eq('chat_id', chat_id)
+      .order('timestamp', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching messages:', error);
+      return NextResponse.json({ error: 'Failed to fetch messages.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ messages: data }, { status: 200 });
+  } catch (error) {
+    console.error('Error in GET /api/chat/chats/messages:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}

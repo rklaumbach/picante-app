@@ -18,6 +18,9 @@ const ChatPage: React.FC = () => {
   // Ensure chatId is a string
   const chatId: string | undefined = Array.isArray(chatIdParam) ? chatIdParam[0] : chatIdParam;
 
+  console.log(`Current chatId: ${chatId}`); // Debugging line
+
+
   const { data: session, status } = useSession();
 
   // Debugging: Log session status and data
