@@ -35,7 +35,7 @@ const GalleryPage: React.FC = () => {
     columnWidth: 200,
     rowHeight: 200,
     containerWidth: 400,
-    containerHeight: 1000,
+    containerHeight: 600,
   });
 
   const { ref, inView } = useInView({
@@ -133,26 +133,6 @@ const GalleryPage: React.FC = () => {
     updateGridConfig();
     window.addEventListener('resize', updateGridConfig);
     return () => window.removeEventListener('resize', updateGridConfig);
-  }, []);
-
-  useEffect(() => {
-    // Update containerWidth after component mounts
-    const updateContainerWidth = () => {
-      setGridConfig((prev) => ({
-        ...prev,
-        containerWidth: window.innerWidth,
-      }));
-    };
-  
-    updateContainerWidth(); // Set initial width
-  
-    // Optional: Add event listener for window resize
-    window.addEventListener('resize', updateContainerWidth);
-  
-    // Cleanup event listener on unmount
-    return () => {
-      window.removeEventListener('resize', updateContainerWidth);
-    };
   }, []);
   
   const handleImageClick = (image: ImageData) => {
