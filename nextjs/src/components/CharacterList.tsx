@@ -7,7 +7,7 @@ import { Character } from '@/types/types';
 import Button from './Button';
 import Dialog from './Dialog';
 import EnlargeCharacterImage from './EnlargeCharacterImage';
-import { getSignedUrl } from '../lib/signedUrls';
+// Removed import of getSignedUrl
 import { toast } from 'react-toastify';
 
 interface CharacterListProps {
@@ -26,6 +26,7 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [isImageEnlarged, setIsImageEnlarged] = useState(false);
 
+  // Fetch characters and their signed URLs
   const fetchCharacters = async () => {
     try {
       const response = await fetch('/api/chat/characters', {
@@ -35,9 +36,44 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setCharacters(data.characters);
+        const charactersData: Character[] = data.characters;
+
+        // Fetch signed URLs for each character
+        const charactersWithSignedUrls = await Promise.all(
+          charactersData.map(async (character) => {
+            // Ensure that character has an image_id
+            // Adjust 'image_id' based on your actual schema
+            const imageId = character.image_id; // Replace 'image_id' with the correct field name
+
+            if (imageId) {
+              try {
+                const signedUrlResponse = await fetch('/api/images/refresh-signed-url', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ imageId }),
+                });
+
+                if (signedUrlResponse.ok) {
+                  const { newSignedUrl } = await signedUrlResponse.json();
+                  return { ...character, signed_image_url: newSignedUrl };
+                } else {
+                  console.error(`Failed to fetch signed URL for character ID ${character.id}:`, signedUrlResponse.statusText);
+                  return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
+                }
+              } catch (error) {
+                console.error(`Error fetching signed URL for character ID ${character.id}:`, error);
+                return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
+              }
+            } else {
+              console.warn(`Character ID ${character.id} does not have an associated image_id.`);
+              return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
+            }
+          })
+        );
+
+        setCharacters(charactersWithSignedUrls);
       } else {
-        console.error('Failed to fetch characters.');
+        console.error('Failed to fetch characters:', response.status, response.statusText);
         toast.error('Failed to fetch characters.');
       }
     } catch (error) {
@@ -50,6 +86,7 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
     fetchCharacters();
   }, []);
 
+  // Handle creating a new character
   const handleCreateCharacter = async () => {
     if (!newCharacter.name || !newCharacter.image_path) {
       toast.error('Name and image are required.');
@@ -65,7 +102,36 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setCharacters([...characters, data.character]);
+        const createdCharacter: Character = data.character;
+
+        // Fetch signed URL for the newly created character
+        const imageId = createdCharacter.image_id; // Replace 'image_id' with the correct field name
+
+        if (imageId) {
+          try {
+            const signedUrlResponse = await fetch('/api/images/refresh-signed-url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageId }),
+            });
+
+            if (signedUrlResponse.ok) {
+              const { newSignedUrl } = await signedUrlResponse.json();
+              createdCharacter.signed_image_url = newSignedUrl;
+            } else {
+              console.error(`Failed to fetch signed URL for new character ID ${createdCharacter.id}:`, signedUrlResponse.statusText);
+              createdCharacter.signed_image_url = '/default-avatar.png'; // Fallback image
+            }
+          } catch (error) {
+            console.error(`Error fetching signed URL for new character ID ${createdCharacter.id}:`, error);
+            createdCharacter.signed_image_url = '/default-avatar.png'; // Fallback image
+          }
+        } else {
+          console.warn(`New character ID ${createdCharacter.id} does not have an associated image_id.`);
+          createdCharacter.signed_image_url = '/default-avatar.png'; // Fallback image
+        }
+
+        setCharacters([...characters, createdCharacter]);
         setIsDialogOpen(false);
         setNewCharacter({
           name: '',
@@ -84,6 +150,7 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
     }
   };
 
+  // Handle image click to enlarge
   const handleImageClick = (character: Character) => {
     setSelectedCharacter(character);
     setIsImageEnlarged(true);
@@ -91,6 +158,7 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
 
   return (
     <div className="w-full">
+      {/* Header and New Character Button */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-semibold text-white">Characters</h2>
         <Button
@@ -99,19 +167,21 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
           onClick={() => setIsDialogOpen(true)}
         />
       </div>
+
+      {/* Character Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {characters.map((character) => (
           <div
             key={character.id}
-            className="bg-gray-700 rounded-lg p-4 flex flex-col items-center cursor-pointer"
+            className="bg-gray-700 rounded-lg p-4 flex flex-col items-center cursor-pointer hover:bg-gray-600 transition duration-200"
             onClick={() => onSelectCharacter(character)}
           >
             <img
-              src={character.signed_image_url}
+              src={character.signed_image_url || '/default-avatar.png'} // Fallback to default image
               alt={character.name}
               className="w-24 h-24 rounded-full object-cover mb-2"
               onClick={(e) => {
-                e.stopPropagation();
+                e.stopPropagation(); // Prevent triggering the parent onClick
                 handleImageClick(character);
               }}
             />

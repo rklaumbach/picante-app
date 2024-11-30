@@ -14,7 +14,7 @@ export interface ImageData {
 export interface Character {
   id: string;
   name: string;
-  image_path: string;
+  image_id: string;
   signed_image_url: string;
   personality_traits: string;
   other_info: string;
