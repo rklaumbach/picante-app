@@ -53,7 +53,7 @@ const CachedImage: React.FC<CachedImageProps> = ({ imageData }) => {
       onError={handleError}
       loading="lazy"
       unoptimized={true}
-      className="rounded-lg transform transition-transform duration-200 hover:scale-105"
+      className="object-cover w-full h-full rounded-lg transform transition-transform duration-200 hover:scale-105"
     />
   );
 };

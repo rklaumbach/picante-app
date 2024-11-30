@@ -13,8 +13,14 @@ import Button from '../../components/Button';
 import { toast } from 'react-toastify';
 import { ImageData } from '@/types/types';
 import Image from 'next/image';
+import { FixedSizeGrid as Grid } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import CachedImage from '@/components/CachedImage'; // Import the CachedImage component
 import { useInView } from 'react-intersection-observer';
+
+
+const COLUMN_WIDTH = 250; // Adjust based on your design
+const ROW_HEIGHT = 250; // Adjust based on your design
 
 const GalleryPage: React.FC = () => {
   const { data: session, status } = useSession();
@@ -173,6 +179,33 @@ const GalleryPage: React.FC = () => {
     );
   }
 
+  const Cell = ({ columnIndex, rowIndex, style }: any) => {
+    const index = rowIndex * numColumns + columnIndex;
+    if (index >= images.length) return null;
+    const image = images[index];
+
+    return (
+      <div
+        style={style}
+        className="relative group cursor-pointer overflow-hidden"
+        onClick={() => handleImageClick(image)}
+      >
+        <CachedImage imageData={image} />
+        <button
+          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDeleteClick(image.id);
+          }}
+          aria-label="Delete Image"
+        >
+          ✖
+        </button>
+      </div>
+    );
+  };
+
+
   return (
     <>
       <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl min-h-screen pt-20">
@@ -183,66 +216,39 @@ const GalleryPage: React.FC = () => {
           {/* Smaller Title Above the Gallery */}
           <h2 className="text-2xl font-semibold mt-6 text-black">Your Images:</h2>
 
-          {/* Scrollable Image Gallery */}
-          <div className="w-full h-full mt-4 overflow-y-auto overflow-x-hidden px-2">
+          {/* Virtualized Image Gallery */}
+          <div className="w-full h-full mt-4 px-2">
             {images.length === 0 ? (
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {images.map((image, index) => {
-                  // Attach the ref to the last image for infinite scrolling
-                  if (index === images.length - 1) {
-                    return (
-                      <div
-                        key={image.id}
-                        ref={ref}
-                        className="relative group cursor-pointer overflow-hidden"
-                        onClick={() => handleImageClick(image)}
-                      >
-                        <CachedImage imageData={image} />
-                        <button
-                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the image click
-                            handleDeleteClick(image.id);
-                          }}
-                          aria-label="Delete Image"
-                        >
-                          ✖
-                        </button>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div
-                        key={image.id}
-                        className="relative group cursor-pointer overflow-hidden"
-                        onClick={() => handleImageClick(image)}
-                      >
-                        <CachedImage imageData={image} />
-                        <button
-                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the image click
-                            handleDeleteClick(image.id);
-                          }}
-                          aria-label="Delete Image"
-                        >
-                          ✖
-                        </button>
-                      </div>
-                    );
-                  }
-                })}
-              </div>
-            )}
-            {/* Sentinel for Infinite Scroll */}
-            {hasMore && (
-              <div ref={ref} className="h-10">
-                {loading && <p className="text-center text-gray-500">Loading more images...</p>}
-              </div>
+              <AutoSizer>
+                {({ height, width }) => {
+                  const numColumns = Math.floor(width / COLUMN_WIDTH);
+                  const numRows = Math.ceil(images.length / numColumns);
+
+                  return (
+                    <Grid
+                      columnCount={numColumns}
+                      columnWidth={COLUMN_WIDTH}
+                      height={height}
+                      rowCount={numRows}
+                      rowHeight={ROW_HEIGHT}
+                      width={width}
+                    >
+                      {Cell}
+                    </Grid>
+                  );
+                }}
+              </AutoSizer>
             )}
           </div>
+
+          {/* Sentinel for Infinite Scroll */}
+          {hasMore && (
+            <div ref={ref} className="h-10">
+              {loading && <p className="text-center text-gray-500">Loading more images...</p>}
+            </div>
+          )}
 
           {/* Image Overlay Modal */}
           {selectedImage && (
