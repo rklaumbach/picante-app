@@ -9,106 +9,95 @@ export async function GET(req: NextRequest) {
     // Authenticate the user
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (!token) {
-      console.error('Authentication failed: No token found.');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = token.sub as string;
 
-    // Fetch chats along with associated characters
-    const { data: chats, error } = await supabaseAdmin
+    // Fetch chats associated with the user
+    const { data: chats, error: chatsError } = await supabaseAdmin
       .from('chats')
       .select(`
-        *,
-        characters:characters(id, user_id, name, image_path, personality_traits, other_info)
+        id,
+        title,
+        scenario,
+        updated_at,
+        character:characters (
+          id,
+          name,
+          image_id
+        )
       `)
-      .eq('user_id', userId)
+      .eq('user_id', userId) // Filter chats by user
       .order('updated_at', { ascending: false });
 
-    if (error) {
-      console.error('Supabase fetch error:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch chats.', details: error.message },
-        { status: 500 }
-      );
+    if (chatsError) {
+      console.error('Error fetching chats:', chatsError);
+      return NextResponse.json({ error: 'Failed to fetch chats.' }, { status: 500 });
     }
 
-    // Generate signed_image_url for each character
-    const chatsWithCharacterURLs = await Promise.all(
-      chats.map(async (chat) => {
-        if (chat.characters && chat.characters.image_path) {
-          const { data: signedData, error: urlError } = await supabaseAdmin.storage
-            .from('user-images') // Ensure this matches your storage bucket name
-            .createSignedUrl(chat.characters.image_path, 60*60); // URL valid for 60 seconds
-
-          if (urlError) {
-            console.error(`Error generating signed URL for character ${chat.characters.id}:`, urlError);
-            chat.characters.signed_image_url = null; // Or set a default image URL
-          } else {
-            chat.characters.signed_image_url = signedData?.signedUrl;
-          }
-        } else {
-          chat.characters = {
-            ...chat.characters,
-            signed_image_url: null, // Or set a default image URL
-          };
-        }
-
-        return chat;
-      })
-    );
-
-    return NextResponse.json({ chats: chatsWithCharacterURLs }, { status: 200 });
-  } catch (error: any) {
-    console.error('Unexpected error in GET /api/chat/chats:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error', details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ chats }, { status: 200 });
+  } catch (error) {
+    console.error('Error in GET /api/chat/chats:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
-// src/app/api/chat/chats/route.ts
-
 export async function POST(req: NextRequest) {
-    try {
-      // Authenticate the user
-      const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-      if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-  
-      const userId = token.sub as string;
-  
-      // Parse the request body
-      const { title, scenario, character_id } = await req.json();
-  
-      if (!title || !scenario || !character_id) {
-        return NextResponse.json({ error: 'Title, scenario, and character_id are required.' }, { status: 400 });
-      }
-  
-      // Insert the new chat into the database
-      const { data, error } = await supabaseAdmin
-        .from('chats')
-        .insert([
-          {
-            user_id: userId,
-            title,
-            scenario,
-            character_id,
-          },
-        ])
-        .single();
-  
-      if (error) {
-        console.error('Error creating chat:', error);
-        return NextResponse.json({ error: 'Failed to create chat.' }, { status: 500 });
-      }
-  
-      return NextResponse.json({ chat: data }, { status: 201 });
-    } catch (error) {
-      console.error('Error in POST /api/chat/chats:', error);
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  try {
+    // Authenticate the user
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const userId = token.sub as string;
+
+    // Parse the request body
+    const { title, scenario, character_id } = await req.json();
+
+    if (!title || !scenario || !character_id) {
+      return NextResponse.json({ error: 'Title, scenario, and character_id are required.' }, { status: 400 });
+    }
+
+    // Verify that the character belongs to the user
+    const { data: characterData, error: characterError } = await supabaseAdmin
+      .from('characters')
+      .select('id, user_id, image_id')
+      .eq('id', character_id)
+      .single();
+
+    if (characterError || !characterData) {
+      console.error('Error fetching character:', characterError);
+      return NextResponse.json({ error: 'Character not found.' }, { status: 404 });
+    }
+
+    if (characterData.user_id !== userId) {
+      return NextResponse.json({ error: 'Forbidden: Character does not belong to the user.' }, { status: 403 });
+    }
+
+    // Insert the new chat into the database
+    const { data: chatData, error: chatError } = await supabaseAdmin
+      .from('chats')
+      .insert([
+        {
+          title,
+          scenario,
+          character_id,
+          user_id: userId, // Assuming 'user_id' exists in 'chats' table
+        },
+      ])
+      .select()
+      .single();
+
+    if (chatError) {
+      console.error('Error creating chat:', chatError);
+      return NextResponse.json({ error: 'Failed to create chat.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ chat: chatData }, { status: 201 });
+  } catch (error) {
+    console.error('Error in POST /api/chat/chats:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-  
+}

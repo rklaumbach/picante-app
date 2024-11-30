@@ -31,7 +31,7 @@ export interface Chat {
   character_id: string;
   last_response: string;
   updated_at: string;
-  characters: Character; // Added property
+  character: Character; // Added property
 }
 
 export interface Message {

@@ -31,10 +31,55 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setChats(data.chats);
+        const fetchedChats: Chat[] = data.chats;
+
+        // Extract unique image_ids
+        const uniqueImageIds = Array.from(
+          new Set(fetchedChats.map((chat) => chat.character.image_id))
+        );
+
+        // Fetch signed URLs for each unique image_id
+        const signedUrlPromises = uniqueImageIds.map(async (imageId) => {
+          try {
+            const res = await fetch('/api/images/refresh-signed-url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageId }),
+            });
+
+            if (res.ok) {
+              const { newSignedUrl } = await res.json();
+              return { imageId, signedUrl: newSignedUrl };
+            } else {
+              console.error(`Failed to fetch signed URL for image ID ${imageId}:`, res.statusText);
+              return { imageId, signedUrl: '/default-avatar.png' };
+            }
+          } catch (error) {
+            console.error(`Error fetching signed URL for image ID ${imageId}:`, error);
+            return { imageId, signedUrl: '/default-avatar.png' };
+          }
+        });
+
+        const signedUrls = await Promise.all(signedUrlPromises);
+        const imageIdToUrlMap: { [key: string]: string } = {};
+        signedUrls.forEach(({ imageId, signedUrl }) => {
+          imageIdToUrlMap[imageId] = signedUrl;
+        });
+
+        // Map signed URLs to chats
+        const chatsWithImages = fetchedChats.map((chat) => ({
+          ...chat,
+          character: {
+            ...chat.character,
+            signed_image_url: imageIdToUrlMap[chat.character.image_id] || '/default-avatar.png',
+          },
+        }));
+
+        setChats(chatsWithImages);
       } else {
-        console.error('Failed to fetch chats.');
-        toast.error('Failed to fetch chats.');
+        const errorData = await response.json();
+        console.error('Failed to fetch chats:', errorData);
+        toast.error(errorData.error || 'Failed to fetch chats.');
       }
     } catch (error) {
       console.error('Error fetching chats:', error);
@@ -65,12 +110,46 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setChats([data.chat, ...chats]);
-        setIsDialogOpen(false);
-        setNewChat({ title: '', scenario: '' });
-        toast.success('Chat created successfully!');
+        const createdChat: Chat = data.chat;
+
+        // Fetch signed URL for the created chat's character
+        try {
+          const res = await fetch('/api/images/refresh-signed-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageId: createdChat.character.image_id }),
+          });
+
+          let signedUrl = '/default-avatar.png';
+          if (res.ok) {
+            const { newSignedUrl } = await res.json();
+            signedUrl = newSignedUrl;
+          } else {
+            console.error(`Failed to fetch signed URL for image ID ${createdChat.character.image_id}:`, res.statusText);
+          }
+
+          const chatWithImage = {
+            ...createdChat,
+            character: {
+              ...createdChat.character,
+              signed_image_url: signedUrl,
+            },
+          };
+
+          setChats([chatWithImage, ...chats]);
+          setIsDialogOpen(false);
+          setNewChat({ title: '', scenario: '' });
+          toast.success('Chat created successfully!');
+        } catch (error) {
+          console.error('Error fetching signed URL for created chat:', error);
+          setChats([createdChat, ...chats]); // Add without signed_image_url
+          setIsDialogOpen(false);
+          setNewChat({ title: '', scenario: '' });
+          toast.success('Chat created successfully, but failed to load image.');
+        }
       } else {
         const errorData = await response.json();
+        console.error('Failed to create chat:', errorData);
         toast.error(errorData.error || 'Failed to create chat.');
       }
     } catch (error) {
@@ -101,8 +180,8 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
             >
               <div className="flex items-center space-x-4">
                 <img
-                  src={chat.characters?.signed_image_url || selectedCharacter.signed_image_url}
-                  alt={chat.characters?.name || selectedCharacter.name}
+                  src={chat.character.signed_image_url || '/default-avatar.png'}
+                  alt={chat.character.name}
                   className="w-12 h-12 rounded-full object-cover"
                 />
                 <div>
