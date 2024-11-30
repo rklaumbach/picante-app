@@ -4,6 +4,8 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { ImageData } from '@/types/types';
+import Spinner from './Spinner';
+
 
 interface CachedImageProps {
   imageData: ImageData;
@@ -12,6 +14,7 @@ interface CachedImageProps {
 const CachedImage: React.FC<CachedImageProps> = ({ imageData }) => {
   const [currentSrc, setCurrentSrc] = useState(imageData.image_url);
   const [retryCount, setRetryCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleError = async () => {
     if (retryCount >= 3) {
@@ -45,16 +48,20 @@ const CachedImage: React.FC<CachedImageProps> = ({ imageData }) => {
   };
 
   return (
+    <div className="relative w-full h-full">
+      {isLoading && <Spinner />}
     <Image
       src={currentSrc}
       alt={imageData.filename}
       width={imageData.width}
       height={imageData.height}
       onError={handleError}
+      onLoadingComplete={() => setIsLoading(false)}
       loading="lazy"
       unoptimized={true}
       className="object-cover w-full h-full transform transition-transform duration-200 hover:scale-105"
-    />
+      />
+    </div>
   );
 };
 
