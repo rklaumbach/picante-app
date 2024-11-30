@@ -1,12 +1,13 @@
 // src/components/ChatInterface.tsx
 
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Message } from '@/types/types';
 import Button from './Button';
-import { supabaseClient } from '../lib/supabaseClient';
+import { supabaseClient } from '@/lib/supabaseClient'; // Correct import
 import { toast } from 'react-toastify';
 import { RealtimePostgresInsertPayload } from '@supabase/supabase-js';
-
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -50,41 +51,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId }) => {
 
     const channelName = `chat-${chatId}`;
 
-    const handleInserts = (payload: any) => {
-      console.log('Change received!', payload)
-    }
-    
-
-
     // Subscribe to real-time updates using Supabase Realtime
     const subscription = supabaseClient
-    .channel(channelName)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` },
-    (payload: RealtimePostgresInsertPayload<Message>) => {
-      setMessages((prev) => [...prev, payload.new]);
-      scrollToBottom();
-    }
-    )
-    .subscribe();
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` },
+        (payload: RealtimePostgresInsertPayload<Message>) => {
+          setMessages((prev) => [...prev, payload.new]);
+          scrollToBottom();
+        }
+      )
+      .subscribe();
 
     // Cleanup subscription on unmount
     return () => {
-      subscription.unsubscribe();
+      supabaseClient.removeChannel(subscription);
     };
   }, [chatId]);
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
-  
+
     setIsSending(true);
-  
+
     try {
       const response = await fetch(`/api/chat/chats/messages?chat_id=${encodeURIComponent(chatId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: 'user', content: input.trim() }),
       });
-  
+
       if (response.ok) {
         const data = await response.json();
         // The assistant's response will be automatically added via real-time subscription
