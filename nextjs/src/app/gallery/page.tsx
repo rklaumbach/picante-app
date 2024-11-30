@@ -195,31 +195,35 @@ const GalleryPage: React.FC = () => {
                   const numRows = Math.ceil(images.length / numColumns);
 
                   // Define the Cell component inside AutoSizer to access numColumns
-                  const Cell = React.memo(({ columnIndex, rowIndex, style }: any) => {
-                    const index = rowIndex * numColumns + columnIndex;
-                    if (index >= images.length) return null;
-                    const image = images[index];
+                  const Cell: React.FC<{ columnIndex: number; rowIndex: number; style: React.CSSProperties }> = React.memo(
+                    function CellComponent({ columnIndex, rowIndex, style }) {
+                      const index = rowIndex * numColumns + columnIndex;
+                      if (index >= images.length) return null;
+                      const image = images[index];
 
-                    return (
-                      <div
-                        style={style}
-                        className="relative group cursor-pointer overflow-hidden"
-                        onClick={() => handleImageClick(image)}
-                      >
-                        <CachedImage imageData={image} />
-                        <button
-                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteClick(image.id);
-                          }}
-                          aria-label="Delete Image"
+                      return (
+                        <div
+                          style={style}
+                          className="relative group cursor-pointer overflow-hidden"
+                          onClick={() => handleImageClick(image)}
                         >
-                          ✖
-                        </button>
-                      </div>
-                    );
-                  });
+                          <CachedImage imageData={image} />
+                          <button
+                            className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(image.id);
+                            }}
+                            aria-label="Delete Image"
+                          >
+                            ✖
+                          </button>
+                        </div>
+                      );
+                    });
+
+                  // Assign a display name for ESLint
+                  Cell.displayName = 'Cell';
 
                   return (
                     <Grid
