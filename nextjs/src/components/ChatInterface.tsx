@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message } from '@/types/types';
 import Button from './Button';
-import { supabaseClient } from '@/lib/supabaseClient'; // Correct import
+import { supabaseFrontendClient } from '@/lib/supabaseFrontendClient'; // Correct import
 import { toast } from 'react-toastify';
 import { RealtimePostgresInsertPayload } from '@supabase/supabase-js';
 
@@ -52,7 +52,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId }) => {
     const channelName = `chat-${chatId}`;
 
     // Subscribe to real-time updates using Supabase Realtime
-    const subscription = supabaseClient
+    const subscription = supabaseFrontendClient
       .channel(channelName)
       .on(
         'postgres_changes',
@@ -66,7 +66,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId }) => {
 
     // Cleanup subscription on unmount
     return () => {
-      supabaseClient.removeChannel(subscription);
+      supabaseFrontendClient.removeChannel(subscription);
     };
   }, [chatId]);
 
