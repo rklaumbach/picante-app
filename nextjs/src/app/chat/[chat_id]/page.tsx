@@ -2,20 +2,49 @@
 
 'use client';
 
-import React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Header from '../../../components/Header';
 import ChatInterface from '../../../components/ChatInterface';
 import BottomNav from '../../../components/BottomNav';
+import { useSession } from 'next-auth/react';
+import { toast } from 'react-toastify';
 
 const ChatPage: React.FC = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const chatId = searchParams.get('chat_id');
+  const params = useParams();
+  const chatIdParam = params.chat_id;
+
+  // Ensure chatId is a string
+  const chatId: string | undefined = Array.isArray(chatIdParam) ? chatIdParam[0] : chatIdParam;
+
+  const { data: session, status } = useSession();
+
+  // Debugging: Log session status and data
+  useEffect(() => {
+    console.log('Session status:', status);
+    console.log('Session data:', session);
+    if (status === 'loading') {
+      console.log('Session is loading...');
+      return; // Do nothing while loading
+    }
+    if (!session) {
+      console.log('No session detected. Redirecting to /chat');
+      toast.error('You must be logged in to access this chat.');
+      router.push('/chat'); // Redirect to main chat page
+    }
+  }, [session, status, router]);
+
+  // Redirect if no chatId is present
+  useEffect(() => {
+    if (!chatId) {
+      console.log('No chat_id found in route. Redirecting to /chat');
+      router.push('/chat');
+    }
+  }, [chatId, router]);
 
   if (!chatId) {
-    // Redirect to chat list if no chat_id is present
-    router.push('/chat');
+    // Optionally, you can render a loading state or null
     return null;
   }
 
