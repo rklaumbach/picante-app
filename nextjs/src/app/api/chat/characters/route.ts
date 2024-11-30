@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
             other_info,
           },
         ])
+        .select()
         .single();
   
       if (error) {
