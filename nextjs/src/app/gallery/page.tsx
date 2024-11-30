@@ -226,16 +226,18 @@ const GalleryPage: React.FC = () => {
                   Cell.displayName = 'Cell';
 
                   return (
-                    <Grid
-                      columnCount={numColumns}
-                      columnWidth={COLUMN_WIDTH}
-                      height={height}
-                      rowCount={numRows}
-                      rowHeight={ROW_HEIGHT}
-                      width={width}
-                    >
-                      {Cell}
-                    </Grid>
+                    <div className="flex justify-center">
+                      <Grid
+                        columnCount={numColumns}
+                        columnWidth={COLUMN_WIDTH}
+                        height={height}
+                        rowCount={numRows}
+                        rowHeight={ROW_HEIGHT}
+                        width={width}
+                      >
+                        {Cell}
+                      </Grid>
+                    </div>
                   );
                 }}
               </AutoSizer>
