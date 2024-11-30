@@ -33,12 +33,17 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
         const data = await response.json();
         const fetchedChats: Chat[] = data.chats;
 
-        // Extract unique image_ids
+        if (!fetchedChats) {
+          toast.error('No chats data received.');
+          return;
+        }
+
+        // Extract unique image_ids from chats
         const uniqueImageIds = Array.from(
           new Set(fetchedChats.map((chat) => chat.character.image_id))
         );
 
-        // Fetch signed URLs for each unique image_id
+        // Fetch signed URLs for unique image_ids
         const signedUrlPromises = uniqueImageIds.map(async (imageId) => {
           try {
             const res = await fetch('/api/images/refresh-signed-url', {
@@ -66,7 +71,7 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
           imageIdToUrlMap[imageId] = signedUrl;
         });
 
-        // Map signed URLs to chats
+        // Assign signed_image_url to each chat's character
         const chatsWithImages = fetchedChats.map((chat) => ({
           ...chat,
           character: {
@@ -112,6 +117,13 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
         const data = await response.json();
         const createdChat: Chat = data.chat;
 
+        // Defensive check to ensure 'character' exists
+        if (!createdChat || !createdChat.character) {
+          console.error('Created chat does not have a character:', data);
+          toast.error('Failed to retrieve chat details.');
+          return;
+        }
+
         // Fetch signed URL for the created chat's character
         try {
           const res = await fetch('/api/images/refresh-signed-url', {
@@ -142,7 +154,15 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
           toast.success('Chat created successfully!');
         } catch (error) {
           console.error('Error fetching signed URL for created chat:', error);
-          setChats([createdChat, ...chats]); // Add without signed_image_url
+          // Even if signed URL fetch fails, add the chat with fallback image
+          const chatWithFallbackImage = {
+            ...createdChat,
+            character: {
+              ...createdChat.character,
+              signed_image_url: '/default-avatar.png',
+            },
+          };
+          setChats([chatWithFallbackImage, ...chats]);
           setIsDialogOpen(false);
           setNewChat({ title: '', scenario: '' });
           toast.success('Chat created successfully, but failed to load image.');
@@ -179,11 +199,14 @@ const ChatList: React.FC<ChatListProps> = ({ selectedCharacter }) => {
               onClick={() => router.push(`/chat/${chat.id}`)}
             >
               <div className="flex items-center space-x-4">
-                <img
-                  src={chat.character.signed_image_url || '/default-avatar.png'}
-                  alt={chat.character.name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
+                {/* Ensure chat.character exists before accessing properties */}
+                {chat.character && (
+                  <img
+                    src={chat.character.signed_image_url || '/default-avatar.png'}
+                    alt={chat.character.name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                )}
                 <div>
                   <h3 className="text-xl text-white">{chat.title}</h3>
                   <p className="text-gray-300">{chat.scenario}</p>

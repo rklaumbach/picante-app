@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     const userId = token.sub as string;
 
-    // Fetch chats associated with the user
+    // Fetch chats associated with the user, including related character data
     const { data: chats, error: chatsError } = await supabaseAdmin
       .from('chats')
       .select(`
@@ -57,7 +57,10 @@ export async function POST(req: NextRequest) {
     const { title, scenario, character_id } = await req.json();
 
     if (!title || !scenario || !character_id) {
-      return NextResponse.json({ error: 'Title, scenario, and character_id are required.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Title, scenario, and character_id are required.' },
+        { status: 400 }
+      );
     }
 
     // Verify that the character belongs to the user
@@ -73,10 +76,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (characterData.user_id !== userId) {
-      return NextResponse.json({ error: 'Forbidden: Character does not belong to the user.' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Character does not belong to the user.' },
+        { status: 403 }
+      );
     }
 
-    // Insert the new chat into the database
+    // Insert the new chat into the database and select the associated character
     const { data: chatData, error: chatError } = await supabaseAdmin
       .from('chats')
       .insert([
@@ -87,12 +93,31 @@ export async function POST(req: NextRequest) {
           user_id: userId, // Assuming 'user_id' exists in 'chats' table
         },
       ])
-      .select()
+      .select(`
+        id,
+        title,
+        scenario,
+        updated_at,
+        character:characters (
+          id,
+          name,
+          image_id
+        )
+      `)
       .single();
 
-    if (chatError) {
+    if (chatError || !chatData) {
       console.error('Error creating chat:', chatError);
       return NextResponse.json({ error: 'Failed to create chat.' }, { status: 500 });
+    }
+
+    // Ensure that the character data is present
+    if (!chatData.character) {
+      console.error('Character data missing in chat response.');
+      return NextResponse.json(
+        { error: 'Character data missing in chat response.' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ chat: chatData }, { status: 201 });
