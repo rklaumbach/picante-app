@@ -7,8 +7,11 @@ import { getToken } from 'next-auth/jwt';
 interface ChatJob {
   prompt: string;
   history: { role: string; content: string }[];
-  max_length?: number;
-  temperature?: number;
+  max_length: number;
+  temperature: number;
+  personality_traits: string;
+  other_info: string;
+  context: string;
 }
 
 interface ChatResponse {
@@ -16,55 +19,7 @@ interface ChatResponse {
   history: { role: string; content: string }[];
 }
 
-export async function GET(req: NextRequest) {
-  // Extract 'chat_id' from query parameters
-  const { searchParams } = req.nextUrl;
-  const chat_id = searchParams.get('chat_id');
-
-  if (!chat_id) {
-    return NextResponse.json({ error: 'chat_id is required as a query parameter.' }, { status: 400 });
-  }
-
-  try {
-    // Authenticate the user
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userId = token.sub as string;
-
-    // Verify that the chat belongs to the user
-    const { data: chatData, error: chatError } = await supabaseAdmin
-      .from('chats')
-      .select('id')
-      .eq('id', chat_id)
-      .eq('user_id', userId)
-      .single();
-
-    if (chatError || !chatData) {
-      console.error('Error fetching chat:', chatError);
-      return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
-    }
-
-    // Fetch messages for the chat
-    const { data, error } = await supabaseAdmin
-      .from('messages')
-      .select('*')
-      .eq('chat_id', chat_id)
-      .order('timestamp', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching messages:', error);
-      return NextResponse.json({ error: 'Failed to fetch messages.' }, { status: 500 });
-    }
-
-    return NextResponse.json({ messages: data }, { status: 200 });
-  } catch (error) {
-    console.error('Error in GET /api/chat/chats/messages:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
-}
+// src/app/api/chat/chats/messages/route.ts
 
 export async function POST(req: NextRequest) {
   // Extract 'chat_id' from query parameters
@@ -87,7 +42,7 @@ export async function POST(req: NextRequest) {
     // Verify that the chat belongs to the user
     const { data: chatData, error: chatError } = await supabaseAdmin
       .from('chats')
-      .select('id, character_id')
+      .select('id, character_id, context') // Include 'context'
       .eq('id', chat_id)
       .eq('user_id', userId)
       .single();
@@ -95,6 +50,18 @@ export async function POST(req: NextRequest) {
     if (chatError || !chatData) {
       console.error('Error fetching chat:', chatError);
       return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
+    }
+
+    // Fetch character details for personality_traits and other_info
+    const { data: characterData, error: characterError } = await supabaseAdmin
+      .from('characters')
+      .select('personality_traits, other_info')
+      .eq('id', chatData.character_id)
+      .single();
+
+    if (characterError || !characterData) {
+      console.error('Error fetching character details:', characterError);
+      return NextResponse.json({ error: 'Character details not found.' }, { status: 500 });
     }
 
     // Parse the request body
@@ -146,10 +113,13 @@ export async function POST(req: NextRequest) {
 
     // Communicate with Modal Chat Service
     const chatResponse = await sendToModalChat({
-      prompt,
-      history,
+      prompt: content,
+      history: history,
       max_length: 200, // Adjust as needed
       temperature: 0.7, // Adjust as needed
+      personality_traits: characterData.personality_traits,
+      other_info: characterData.other_info,
+      context: chatData.context,
     });
 
     // Insert the assistant's response into the database
@@ -190,7 +160,10 @@ export async function POST(req: NextRequest) {
 
 // Helper function to communicate with Modal Chat Service
 const sendToModalChat = async (job: ChatJob): Promise<ChatResponse> => {
-  const response = await fetch(process.env.MODAL_CHAT_API_URL as string, {
+  const modalChatUrl = process.env.MODAL_CHAT_API_URL as string;
+  const chatEndpoint = `${modalChatUrl}/chat`; // Append /chat to the base URL
+
+  const response = await fetch(chatEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
