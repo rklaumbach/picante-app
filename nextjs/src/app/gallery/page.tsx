@@ -2,25 +2,23 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
 import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog';
 import BottomNav from '../../components/BottomNav';
 import ImageModal from '../../components/ImageModal';
 import { useRouter } from 'next/navigation';
-import Button from '../../components/Button';
 import { toast } from 'react-toastify';
 import { ImageData } from '@/types/types';
-import Image from 'next/image';
+import CachedImage from '@/components/CachedImage';
+import { useInView } from 'react-intersection-observer';
 import { FixedSizeGrid as Grid } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import CachedImage from '@/components/CachedImage'; // Import the CachedImage component
-import { useInView } from 'react-intersection-observer';
+import debounce from 'lodash/debounce';
 
-
-const COLUMN_WIDTH = 250; // Adjust based on your design
-const ROW_HEIGHT = 250; // Adjust based on your design
+const COLUMN_WIDTH = 250;
+const ROW_HEIGHT = 250;
 
 const GalleryPage: React.FC = () => {
   const { data: session, status } = useSession();
@@ -34,7 +32,8 @@ const GalleryPage: React.FC = () => {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const { ref, inView } = useInView({
-    threshold: 0,
+    threshold: 0.5,
+    rootMargin: '200px',
   });
 
   const fetchImages = useCallback(async () => {
@@ -76,6 +75,8 @@ const GalleryPage: React.FC = () => {
     }
   }, [status, nextCursor, loading, hasMore]);
 
+  const debouncedFetchImages = useCallback(debounce(fetchImages, 300), [fetchImages]);
+
   useEffect(() => {
     if (status === 'authenticated') {
       fetchImages();
@@ -86,18 +87,18 @@ const GalleryPage: React.FC = () => {
 
   useEffect(() => {
     if (inView && hasMore && !loading) {
-      fetchImages();
+      debouncedFetchImages();
     }
-  }, [inView, hasMore, loading, fetchImages]);
+  }, [inView, hasMore, loading, debouncedFetchImages]);
 
-  const handleImageClick = (image: ImageData) => {
+  const handleImageClick = useCallback((image: ImageData) => {
     setSelectedImage(image);
-  };
+  }, []);
 
-  const handleDeleteClick = (imageId: string) => {
+  const handleDeleteClick = useCallback((imageId: string) => {
     setImageToDelete(imageId);
     setIsDeleteDialogOpen(true);
-  };
+  }, []);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!imageToDelete) return;
@@ -111,7 +112,7 @@ const GalleryPage: React.FC = () => {
       });
 
       if (response.ok) {
-        setImages(images.filter((img) => img.id !== imageToDelete));
+        setImages((prev) => prev.filter((img) => img.id !== imageToDelete));
         setIsDeleteDialogOpen(false);
         setImageToDelete(null);
         toast.success('Image deleted successfully!');
@@ -123,12 +124,10 @@ const GalleryPage: React.FC = () => {
       console.error('Error deleting image:', error);
       toast.error('An error occurred while deleting the image.');
     }
-  }, [imageToDelete, images]);
+  }, [imageToDelete]);
 
-  // Function to handle image download
   const handleDownload = useCallback(async (image: ImageData) => {
     try {
-      // Fetch the image as a blob
       const response = await fetch(image.image_url, {
         method: 'GET',
         headers: {
@@ -143,14 +142,12 @@ const GalleryPage: React.FC = () => {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
 
-      // Create a temporary anchor element and trigger download
       const link = document.createElement('a');
       link.href = url;
-      link.download = image.filename; // Ensure filename has the correct extension
+      link.download = image.filename;
       document.body.appendChild(link);
       link.click();
 
-      // Clean up
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -159,9 +156,7 @@ const GalleryPage: React.FC = () => {
     }
   }, []);
 
-  // Function to handle full view
   const handleFullView = useCallback((image: ImageData) => {
-    // Open the full view in a new tab and pass the image data via sessionStorage
     window.open(image.image_url, '_blank');
   }, []);
 
@@ -179,33 +174,6 @@ const GalleryPage: React.FC = () => {
     );
   }
 
-  const Cell = ({ columnIndex, rowIndex, style }: any) => {
-    const index = rowIndex * numColumns + columnIndex;
-    if (index >= images.length) return null;
-    const image = images[index];
-
-    return (
-      <div
-        style={style}
-        className="relative group cursor-pointer overflow-hidden"
-        onClick={() => handleImageClick(image)}
-      >
-        <CachedImage imageData={image} />
-        <button
-          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDeleteClick(image.id);
-          }}
-          aria-label="Delete Image"
-        >
-          ✖
-        </button>
-      </div>
-    );
-  };
-
-
   return (
     <>
       <main className="flex flex-col items-center px-7 pb-16 mx-auto w-full max-w-7xl min-h-screen pt-20">
@@ -217,14 +185,41 @@ const GalleryPage: React.FC = () => {
           <h2 className="text-2xl font-semibold mt-6 text-black">Your Images:</h2>
 
           {/* Virtualized Image Gallery */}
-          <div className="w-full h-full mt-4 px-2">
+          <div className="w-full h-full mt-4 px-2" style={{ height: '80vh' }}>
             {images.length === 0 ? (
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
               <AutoSizer>
                 {({ height, width }) => {
-                  const numColumns = Math.floor(width / COLUMN_WIDTH);
+                  const numColumns = Math.floor(width / COLUMN_WIDTH) || 1;
                   const numRows = Math.ceil(images.length / numColumns);
+
+                  // Define the Cell component inside AutoSizer to access numColumns
+                  const Cell = React.memo(({ columnIndex, rowIndex, style }: any) => {
+                    const index = rowIndex * numColumns + columnIndex;
+                    if (index >= images.length) return null;
+                    const image = images[index];
+
+                    return (
+                      <div
+                        style={style}
+                        className="relative group cursor-pointer overflow-hidden"
+                        onClick={() => handleImageClick(image)}
+                      >
+                        <CachedImage imageData={image} />
+                        <button
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(image.id);
+                          }}
+                          aria-label="Delete Image"
+                        >
+                          ✖
+                        </button>
+                      </div>
+                    );
+                  });
 
                   return (
                     <Grid
