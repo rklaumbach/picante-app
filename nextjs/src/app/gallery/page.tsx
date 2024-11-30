@@ -13,11 +13,8 @@ import Button from '../../components/Button';
 import { toast } from 'react-toastify';
 import { ImageData } from '@/types/types';
 import Image from 'next/image';
-import CachedImage from '@/components/CachedImage';
+import CachedImage from '@/components/CachedImage'; // Import the CachedImage component
 import { useInView } from 'react-intersection-observer';
-import { FixedSizeGrid } from 'react-window';
-import { debounce } from 'lodash'; 
-
 
 const GalleryPage: React.FC = () => {
   const { data: session, status } = useSession();
@@ -34,7 +31,7 @@ const GalleryPage: React.FC = () => {
     columnCount: 4,
     columnWidth: 200,
     rowHeight: 200,
-    containerWidth: 400,
+    containerWidth: window.innerWidth,
     containerHeight: 600,
   });
 
@@ -42,48 +39,44 @@ const GalleryPage: React.FC = () => {
     threshold: 0,
   });
 
-  const fetchImages = useCallback(
-    debounce(async () => {
-      if (status !== 'authenticated' || loading || !hasMore) return;
-  
-      setLoading(true);
-      try {
-        const url = new URL('/api/images/gallery', window.location.origin);
-        url.searchParams.append('limit', '20');
-        if (nextCursor) {
-          url.searchParams.append('cursor', nextCursor);
-        }
-  
-        const response = await fetch(url.toString(), {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-  
-        if (response.ok) {
-          const data = await response.json();
-          if (Array.isArray(data.images)) {
-            setImages((prev) => [...prev, ...data.images]);
-            setNextCursor(data.nextCursor || null);
-            setHasMore(Boolean(data.nextCursor));
-          } else {
-            console.error('Invalid data format for images:', data.images);
-            setHasMore(false);
-          }
+  const fetchImages = useCallback(async () => {
+    if (status !== 'authenticated' || loading || !hasMore) return;
+
+    setLoading(true);
+    try {
+      const url = new URL('/api/images/gallery', window.location.origin);
+      url.searchParams.append('limit', '20');
+      if (nextCursor) {
+        url.searchParams.append('cursor', nextCursor);
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data.images)) {
+          setImages((prev) => [...prev, ...data.images]);
+          setNextCursor(data.nextCursor || null);
+          setHasMore(Boolean(data.nextCursor));
         } else {
-          console.error('Failed to fetch images:', response.status, response.statusText);
+          console.error('Invalid data format for images:', data.images);
           setHasMore(false);
         }
-      } catch (error) {
-        console.error('Error fetching images:', error);
+      } else {
+        console.error('Failed to fetch images:', response.status, response.statusText);
         setHasMore(false);
-      } finally {
-        setLoading(false);
       }
-    }, 300),
-    [status, nextCursor, loading, hasMore]
-  );
-  
+    } catch (error) {
+      console.error('Error fetching images:', error);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [status, nextCursor, loading, hasMore]);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -99,42 +92,6 @@ const GalleryPage: React.FC = () => {
     }
   }, [inView, hasMore, loading, fetchImages]);
 
-  useEffect(() => {
-    const updateGridConfig = () => {
-      const width = window.innerWidth;
-  
-      if (width < 640) {
-        setGridConfig({
-          columnCount: 1,
-          columnWidth: width - 16,
-          rowHeight: 200,
-          containerWidth: width,
-          containerHeight: 400,
-        });
-      } else if (width < 1024) {
-        setGridConfig({
-          columnCount: 2,
-          columnWidth: (width - 32) / 2,
-          rowHeight: 250,
-          containerWidth: width,
-          containerHeight: 500,
-        });
-      } else {
-        setGridConfig({
-          columnCount: 4,
-          columnWidth: (width - 64) / 4,
-          rowHeight: 300,
-          containerWidth: width,
-          containerHeight: 600,
-        });
-      }
-    };
-  
-    updateGridConfig();
-    window.addEventListener('resize', updateGridConfig);
-    return () => window.removeEventListener('resize', updateGridConfig);
-  }, []);
-  
   const handleImageClick = (image: ImageData) => {
     setSelectedImage(image);
   };
@@ -240,12 +197,12 @@ const GalleryPage: React.FC = () => {
               <p className="text-white">No images found. Start generating and saving your images!</p>
             ) : (
               <FixedSizeGrid
-              columnCount={4} // Adjust based on your desired number of columns
-              rowCount={Math.ceil(images.length / 4)} // Calculate the rows
-              columnWidth={200} // Adjust based on your design
-              rowHeight={200} // Set height of each row
-              height={600} // Container height
-              width={800} // Container width
+              columnCount={gridConfig.columnCount}
+              rowCount={Math.ceil(images.length / gridConfig.columnCount)}
+              columnWidth={gridConfig.columnWidth}
+              rowHeight={gridConfig.rowHeight}
+              height={gridConfig.containerHeight}
+              width={gridConfig.containerWidth}
               >
                 {({ columnIndex, rowIndex, style }) => {
                   const imageIndex = rowIndex * 4 + columnIndex;
@@ -271,7 +228,6 @@ const GalleryPage: React.FC = () => {
                 {loading && <p className="text-center text-gray-500">Loading more images...</p>}
               </div>
             )}
-
           </div>
 
           {/* Image Overlay Modal */}
