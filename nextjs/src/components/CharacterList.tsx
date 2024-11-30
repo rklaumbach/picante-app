@@ -3,11 +3,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Character } from '@/types/types';
+import { Character, ImageData } from '@/types/types';
 import Button from './Button';
 import Dialog from './Dialog';
 import EnlargeCharacterImage from './EnlargeCharacterImage';
-// Removed import of getSignedUrl
 import { toast } from 'react-toastify';
 
 interface CharacterListProps {
@@ -16,79 +15,94 @@ interface CharacterListProps {
 
 const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [images, setImages] = useState<ImageData[]>([]); // State to hold user's images
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newCharacter, setNewCharacter] = useState({
     name: '',
-    image_path: '',
+    image_id: '', // Changed from image_path to image_id
     personality_traits: '',
     other_info: '',
   });
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [isImageEnlarged, setIsImageEnlarged] = useState(false);
 
-  // Fetch characters and their signed URLs
-  const fetchCharacters = async () => {
+  // Fetch characters and images
+  const fetchData = async () => {
     try {
-      const response = await fetch('/api/chat/characters', {
+      // Fetch characters
+      const charactersResponse = await fetch('/api/chat/characters', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const charactersData: Character[] = data.characters;
-
-        // Fetch signed URLs for each character
-        const charactersWithSignedUrls = await Promise.all(
-          charactersData.map(async (character) => {
-            // Ensure that character has an image_id
-            // Adjust 'image_id' based on your actual schema
-            const imageId = character.image_id; // Replace 'image_id' with the correct field name
-
-            if (imageId) {
-              try {
-                const signedUrlResponse = await fetch('/api/images/refresh-signed-url', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ imageId }),
-                });
-
-                if (signedUrlResponse.ok) {
-                  const { newSignedUrl } = await signedUrlResponse.json();
-                  return { ...character, signed_image_url: newSignedUrl };
-                } else {
-                  console.error(`Failed to fetch signed URL for character ID ${character.id}:`, signedUrlResponse.statusText);
-                  return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
-                }
-              } catch (error) {
-                console.error(`Error fetching signed URL for character ID ${character.id}:`, error);
-                return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
-              }
-            } else {
-              console.warn(`Character ID ${character.id} does not have an associated image_id.`);
-              return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
-            }
-          })
-        );
-
-        setCharacters(charactersWithSignedUrls);
+      let charactersData: Character[] = [];
+      if (charactersResponse.ok) {
+        const charactersJson = await charactersResponse.json();
+        charactersData = charactersJson.characters;
       } else {
-        console.error('Failed to fetch characters:', response.status, response.statusText);
+        console.error('Failed to fetch characters:', charactersResponse.status, charactersResponse.statusText);
         toast.error('Failed to fetch characters.');
       }
+
+      // Fetch images
+      const imagesResponse = await fetch('/api/images/user-images', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      let imagesData: ImageData[] = [];
+      if (imagesResponse.ok) {
+        const imagesJson = await imagesResponse.json();
+        imagesData = imagesJson.images;
+      } else {
+        console.error('Failed to fetch images:', imagesResponse.status, imagesResponse.statusText);
+        toast.error('Failed to fetch images.');
+      }
+
+      // Assign signed_image_url to each character
+      const charactersWithSignedUrls = await Promise.all(
+        charactersData.map(async (character) => {
+          if (character.image_id) {
+            try {
+              const signedUrlResponse = await fetch('/api/images/refresh-signed-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageId: character.image_id }),
+              });
+
+              if (signedUrlResponse.ok) {
+                const { newSignedUrl } = await signedUrlResponse.json();
+                return { ...character, signed_image_url: newSignedUrl };
+              } else {
+                console.error(`Failed to fetch signed URL for character ID ${character.id}:`, signedUrlResponse.statusText);
+                return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
+              }
+            } catch (error) {
+              console.error(`Error fetching signed URL for character ID ${character.id}:`, error);
+              return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
+            }
+          } else {
+            console.warn(`Character ID ${character.id} does not have an associated image_id.`);
+            return { ...character, signed_image_url: '/default-avatar.png' }; // Fallback image
+          }
+        })
+      );
+
+      setCharacters(charactersWithSignedUrls);
+      setImages(imagesData);
     } catch (error) {
-      console.error('Error fetching characters:', error);
-      toast.error('An error occurred while fetching characters.');
+      console.error('Error fetching data:', error);
+      toast.error('An error occurred while fetching data.');
     }
   };
 
   useEffect(() => {
-    fetchCharacters();
+    fetchData();
   }, []);
 
   // Handle creating a new character
   const handleCreateCharacter = async () => {
-    if (!newCharacter.name || !newCharacter.image_path) {
+    if (!newCharacter.name || !newCharacter.image_id) {
       toast.error('Name and image are required.');
       return;
     }
@@ -105,14 +119,12 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
         const createdCharacter: Character = data.character;
 
         // Fetch signed URL for the newly created character
-        const imageId = createdCharacter.image_id; // Replace 'image_id' with the correct field name
-
-        if (imageId) {
+        if (createdCharacter.image_id) {
           try {
             const signedUrlResponse = await fetch('/api/images/refresh-signed-url', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ imageId }),
+              body: JSON.stringify({ imageId: createdCharacter.image_id }),
             });
 
             if (signedUrlResponse.ok) {
@@ -135,7 +147,7 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
         setIsDialogOpen(false);
         setNewCharacter({
           name: '',
-          image_path: '',
+          image_id: '',
           personality_traits: '',
           other_info: '',
         });
@@ -202,14 +214,22 @@ const CharacterList: React.FC<CharacterListProps> = ({ onSelectCharacter }) => {
             onChange={(e) => setNewCharacter({ ...newCharacter, name: e.target.value })}
             required
           />
-          <input
-            type="text"
+
+          {/* Image Selection Dropdown */}
+          <select
             className="px-4 py-2 border rounded-lg"
-            placeholder="Image Path (storage/path.jpg)"
-            value={newCharacter.image_path}
-            onChange={(e) => setNewCharacter({ ...newCharacter, image_path: e.target.value })}
+            value={newCharacter.image_id}
+            onChange={(e) => setNewCharacter({ ...newCharacter, image_id: e.target.value })}
             required
-          />
+          >
+            <option value="">Select an Image</option>
+            {images.map((image) => (
+              <option key={image.id} value={image.id}>
+                {image.filename}
+              </option>
+            ))}
+          </select>
+
           <textarea
             className="px-4 py-2 border rounded-lg"
             placeholder="Personality Traits"

@@ -46,9 +46,9 @@ export async function POST(req: NextRequest) {
       const userId = token.sub as string;
   
       // Parse the request body
-      const { name, image_path, personality_traits, other_info } = await req.json();
+      const { name, image_id, personality_traits, other_info } = await req.json();
   
-      if (!name || !image_path) {
+      if (!name || !image_id) {
         return NextResponse.json({ error: 'Name and image path are required.' }, { status: 400 });
       }
   
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
           {
             user_id: userId,
             name,
-            image_path,
+            image_id,
             personality_traits,
             other_info,
           },

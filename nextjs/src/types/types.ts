@@ -13,11 +13,14 @@ export interface ImageData {
 
 export interface Character {
   id: string;
+  user_id: string;
   name: string;
-  image_id: string;
-  signed_image_url: string;
+  image_id: string; // Changed from image_path to image_id
+  signed_image_url?: string;
   personality_traits: string;
   other_info: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Chat {

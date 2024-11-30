@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       .from('images')
       .select('*')
       .eq('id', imageId)
+      .eq('user_id', userId) // Ensure the image belongs to the user
       .single();
 
     if (fetchError || !imageData) {
